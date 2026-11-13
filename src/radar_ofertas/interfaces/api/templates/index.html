@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>tecHunter GT — Comparador de Precios Kemik vs Pacifiko</title>
-  <meta name="description" content="Compara precios de tecnología en Guatemala entre Kemik y Pacifiko con datos en tiempo real almacenados en Neon DB." />
+  <title>tecHunter GT — Comparador de Precios Kemik, Pacifiko y La Torre</title>
+  <meta name="description" content="Compara precios de tecnología, mascotas y supermercado en Guatemala entre Kemik, Pacifiko y Supermercados La Torre con datos en Neon DB." />
 
   <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -67,7 +67,7 @@
           Comparador de Precios en Guatemala
         </h1>
         <p class="mt-1.5 text-sm sm:text-base text-slate-600">
-          Consulta el historial de precios reales en Quetzales entre <strong class="font-semibold text-slate-800">Kemik</strong> y <strong class="font-semibold text-slate-800">Pacifiko</strong> ordenados del más económico al más alto.
+          Consulta precios reales en Quetzales entre <strong class="font-semibold text-slate-800">Kemik</strong>, <strong class="font-semibold text-slate-800">Pacifiko</strong> y <strong class="font-semibold text-slate-800">Supermercados La Torre</strong> ordenados del más económico al más alto.
         </p>
       </div>
 
@@ -88,7 +88,7 @@
             id="search-input"
             name="q"
             value="{{ query }}"
-            placeholder="Buscar producto en Neon DB (ej. volante logitech, g29, g923, shifter)..."
+            placeholder="Buscar en Neon DB (ej. pedigree, purina, volante logitech, g29)..."
             class="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/15 transition-all shadow-sm"
           />
         </div>
@@ -106,7 +106,7 @@
             type="button"
             id="btn-escanear-vivo"
             onclick="escanearEnVivo()"
-            title="Ejecuta los scrapers en vivo e inserta nuevos precios en Neon DB"
+            title="Ejecuta los scrapers (Kemik, Pacifiko y La Torre) en vivo e inserta en Neon DB"
             class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600/15 transition-colors"
           >
             <svg id="icon-scan" class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -119,7 +119,7 @@
 
       <!-- Filtros Rápidos por Tienda y Sugerencias -->
       <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-1.5 text-xs">
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
           <span class="text-slate-500 font-medium mr-1">Tienda:</span>
           <a
             href="/?q={{ query | urlencode }}"
@@ -142,15 +142,24 @@
           >
             Pacifiko ({{ resumen.total_pacifiko }})
           </a>
+          <a
+            href="/?q={{ query | urlencode }}&tienda=la-torre"
+            id="filter-la-torre"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if tienda_activa == 'la-torre' %}bg-teal-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-teal-50 hover:text-teal-800{% endif %}"
+          >
+            La Torre ({{ resumen.total_la_torre }})
+          </a>
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           <span>Búsquedas rápidas:</span>
+          <a href="/?q=pedigree" class="underline hover:text-slate-900">pedigree</a>
+          <span>·</span>
+          <a href="/?q=purina" class="underline hover:text-slate-900">purina</a>
+          <span>·</span>
           <a href="/?q=volante+logitech" class="underline hover:text-slate-900">volante logitech</a>
           <span>·</span>
           <a href="/?q=G29" class="underline hover:text-slate-900">G29</a>
-          <span>·</span>
-          <a href="/?q=G923" class="underline hover:text-slate-900">G923</a>
           <span>·</span>
           <a href="/" class="underline hover:text-slate-900">Ver todo</a>
         </div>
@@ -204,7 +213,7 @@
             {{ resumen.total }}
           </span>
           <span class="text-xs text-slate-500">
-            ({{ resumen.total_kemik }} Kemik · {{ resumen.total_pacifiko }} Pacifiko)
+            ({{ resumen.total_kemik }} Kemik · {{ resumen.total_pacifiko }} Pacifiko · {{ resumen.total_la_torre }} La Torre)
           </span>
         </div>
         <p class="mt-1 text-xs text-slate-500">
@@ -265,6 +274,10 @@
               {% elif oferta.tienda_slug == 'pacifiko' %}
               <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200/80">
                 Pacifiko
+              </span>
+              {% elif oferta.tienda_slug == 'la-torre' %}
+              <span class="inline-flex items-center rounded-md bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 border border-teal-200/80">
+                La Torre
               </span>
               {% else %}
               <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
@@ -347,7 +360,7 @@
           onclick="escanearEnVivo()"
           class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
         >
-          Escanear "{{ query or 'volante logitech' }}" ahora
+          Escanear "{{ query or 'pedigree' }}" ahora
         </button>
       </div>
     </section>
@@ -358,14 +371,14 @@
   <footer class="border-t border-slate-200/80 bg-white py-6 mt-12">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
       <span><strong>tecHunter</strong> — Plataforma de Comparación de Precios en Guatemala (Clean Architecture)</span>
-      <span class="font-mono">Tiendas activas: Kemik · Pacifiko | DB: Neon PostgreSQL</span>
+      <span class="font-mono">Tiendas activas: Kemik · Pacifiko · La Torre | DB: Neon PostgreSQL</span>
     </div>
   </footer>
 
   <script>
     async function escanearEnVivo() {
       const input = document.getElementById('search-input');
-      const query = (input.value || 'volante logitech').trim();
+      const query = (input.value || 'pedigree').trim();
       const btn = document.getElementById('btn-escanear-vivo');
       const label = document.getElementById('label-scan');
       const icon = document.getElementById('icon-scan');
@@ -375,7 +388,7 @@
       icon.classList.add('animate-spin');
       label.textContent = 'Escaneando...';
       toast.classList.remove('hidden');
-      toast.textContent = `Consultando Kemik y Pacifiko en vivo para "${query}" e inyectando en Neon DB...`;
+      toast.textContent = `Consultando Kemik, Pacifiko y La Torre en vivo para "${query}" e inyectando en Neon DB...`;
 
       try {
         const resp = await fetch('/api/escanear', {
@@ -387,7 +400,7 @@
         if (!resp.ok) {
           throw new Error(data.detail || 'Error durante el escaneo');
         }
-        toast.textContent = `¡Listo! Se extrajeron ${data.extraidos_kemik} de Kemik y ${data.extraidos_pacifiko} de Pacifiko (${data.insertados_neon} guardados en Neon DB). Recargando...`;
+        toast.textContent = `¡Listo! Se extrajeron ${data.extraidos_kemik} de Kemik, ${data.extraidos_pacifiko} de Pacifiko y ${data.extraidos_la_torre} de La Torre (${data.insertados_neon} guardados en Neon DB). Recargando...`;
         setTimeout(() => {
           window.location.href = `/?q=${encodeURIComponent(query)}`;
         }, 900);

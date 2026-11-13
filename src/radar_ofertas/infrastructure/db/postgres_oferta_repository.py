@@ -149,6 +149,7 @@ class PostgresOfertaRepository(OfertaRepository):
         urls_conocidas = {
             "kemik": "https://www.kemik.gt",
             "pacifiko": "https://www.pacifiko.com",
+            "la-torre": "https://www.latorre.com.gt",
         }
         url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
         cursor.execute(
@@ -183,8 +184,30 @@ class PostgresOfertaRepository(OfertaRepository):
         return str(row[0])
 
     @staticmethod
+    def _inferir_marca(titulo: str) -> str | None:
+        titulo_lower = titulo.lower()
+        marcas_conocidas = [
+            "Logitech",
+            "Pedigree",
+            "Purina",
+            "Dog Chow",
+            "Pro Plan",
+            "Beneful",
+            "Whiskas",
+            "Ruccan",
+            "Redragon",
+            "Razer",
+            "Sony",
+            "Samsung",
+        ]
+        for marca in marcas_conocidas:
+            if marca.lower() in titulo_lower:
+                return marca
+        return None
+
+    @classmethod
     def _upsert_producto(
-        cursor, oferta: OfertaLocal, categoria_id: str
+        cls, cursor, oferta: OfertaLocal, categoria_id: str
     ) -> str:
         """
         Busca un producto existente por `url_canonica` o por `nombre` (case-insensitive).
@@ -216,7 +239,7 @@ class PostgresOfertaRepository(OfertaRepository):
             )
             return producto_id
 
-        marca = "Logitech" if "logitech" in oferta.titulo.lower() else None
+        marca = cls._inferir_marca(oferta.titulo)
 
         cursor.execute(
             """
@@ -320,7 +343,7 @@ class PostgresOfertaRepository(OfertaRepository):
         condiciones = ["p.activo = TRUE", "t.activo = TRUE"]
         params: list[Any] = []
 
-        if tienda_limpia in {"kemik", "pacifiko"}:
+        if tienda_limpia in {"kemik", "pacifiko", "la-torre"}:
             condiciones.append("t.slug = %s")
             params.append(tienda_limpia)
 
