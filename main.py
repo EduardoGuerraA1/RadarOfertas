@@ -57,11 +57,50 @@ def parse_args() -> argparse.Namespace:
         help="Abre navegador Chromium visible (headless=False) para resolver Cloudflare en entorno local",
     )
     parser.add_argument(
+        "--simular",
+        action="store_true",
+        help="Usa un payload JSON-LD del Volante Logitech G29 para validar mapeo e inserción en Neon DB sin red de Kemik",
+    )
+    parser.add_argument(
         "--sin-db",
         action="store_true",
         help="Solo ejecuta el scraper e imprime en consola sin insertar en Neon DB",
     )
     return parser.parse_args()
+
+
+PAYLOAD_SIMULADO_KEMIK = [
+    {
+        "@type": "Product",
+        "name": "Logitech G29 Driving Force Volante de Carreras y Pedales para PS5, PS4 y PC",
+        "sku": "LOG-941-000110",
+        "url": "/producto/logitech-g29-driving-force-volante-de-carreras-ps5-ps4-pc",
+        "image": [
+            "https://images.kemik.gt/2023/08/LOG-941-000110-1.jpg",
+            "https://images.kemik.gt/2023/08/LOG-941-000110-2.jpg",
+        ],
+        "offers": {
+            "@type": "Offer",
+            "priceCurrency": "GTQ",
+            "price": "2699.00",
+            "availability": "https://schema.org/InStock",
+        },
+    },
+    {
+        "@type": "Product",
+        "name": "Logitech Driving Force Shifter Palanca de Cambios para Volante G29 y G920",
+        "sku": "LOG-941-000119",
+        "url": "https://www.kemik.gt/producto/logitech-driving-force-shifter-palanca-cambios-g29-g920",
+        "image": "/images/catalog/log-shifter-g29.jpg",
+        "offers": [
+            {
+                "@type": "Offer",
+                "priceCurrency": "GTQ",
+                "price": 649.00,
+            }
+        ],
+    },
+]
 
 
 def mostrar_ofertas_en_consola(
@@ -108,7 +147,18 @@ async def ejecutar_orquestador() -> None:
     scraper = KemikScraper(headless=not args.headed)
 
     try:
-        ofertas = await scraper.buscar_producto(termino)
+        if args.simular:
+            logger.info(
+                "Modo simulación (--simular) activo: mapeando JSON-LD de '%s' a OfertaLocal...",
+                termino,
+            )
+            ofertas = [
+                oferta
+                for item in PAYLOAD_SIMULADO_KEMIK
+                if (oferta := scraper._mapear_producto_ld_a_oferta(item)) is not None
+            ]
+        else:
+            ofertas = await scraper.buscar_producto(termino)
 
         if not ofertas:
             print(
