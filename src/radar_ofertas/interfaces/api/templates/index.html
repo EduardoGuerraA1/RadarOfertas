@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="es-GT" class="h-full bg-slate-50 antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tecHunter GT — Comparador de Precios Kemik vs Pacifiko</title>
+  <meta name="description" content="Compara precios de tecnología en Guatemala entre Kemik y Pacifiko con datos en tiempo real almacenados en Neon DB." />
+
+  <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="min-h-full text-slate-900 flex flex-col">
+
+  <!-- Barra Superior Minimalista -->
+  <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <a href="/" id="brand-logo" class="flex items-center gap-2.5 group">
+        <div class="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-sm tracking-tight group-hover:bg-blue-600 transition-colors">
+          tH
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight text-slate-900">tecHunter</span>
+          <span class="ml-1.5 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+            Guatemala
+          </span>
+        </div>
+      </a>
+
+      <div class="flex items-center gap-3 text-xs text-slate-500">
+        <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-200/60">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          Neon PostgreSQL Conectado
+        </span>
+        <a href="/docs" target="_blank" id="api-docs-link" class="px-2.5 py-1 rounded-md border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors font-medium">
+          API Docs ↗
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+
+    <!-- Cabecera y Buscador Principal -->
+    <section class="mb-8">
+      <div class="max-w-3xl">
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          Comparador de Precios en Guatemala
+        </h1>
+        <p class="mt-1.5 text-sm sm:text-base text-slate-600">
+          Consulta el historial de precios reales en Quetzales entre <strong class="font-semibold text-slate-800">Kemik</strong> y <strong class="font-semibold text-slate-800">Pacifiko</strong> ordenados del más económico al más alto.
+        </p>
+      </div>
+
+      <!-- Formulario de Búsqueda -->
+      <form action="/" method="GET" id="search-form" class="mt-6 flex flex-col sm:flex-row gap-3">
+        {% if tienda_activa %}
+        <input type="hidden" name="tienda" value="{{ tienda_activa }}" />
+        {% endif %}
+
+        <div class="relative flex-1">
+          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <input
+            type="search"
+            id="search-input"
+            name="q"
+            value="{{ query }}"
+            placeholder="Buscar producto en Neon DB (ej. volante logitech, g29, g923, shifter)..."
+            class="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/15 transition-all shadow-sm"
+          />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button
+            type="submit"
+            id="btn-buscar-db"
+            class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 transition-colors"
+          >
+            Buscar en DB
+          </button>
+
+          <button
+            type="button"
+            id="btn-escanear-vivo"
+            onclick="escanearEnVivo()"
+            title="Ejecuta los scrapers en vivo e inserta nuevos precios en Neon DB"
+            class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600/15 transition-colors"
+          >
+            <svg id="icon-scan" class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span id="label-scan">Escanear Tiendas</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Filtros Rápidos por Tienda y Sugerencias -->
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-1.5 text-xs">
+          <span class="text-slate-500 font-medium mr-1">Tienda:</span>
+          <a
+            href="/?q={{ query | urlencode }}"
+            id="filter-all"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if not tienda_activa %}bg-slate-900 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-slate-100{% endif %}"
+          >
+            Todas ({{ resumen.total }})
+          </a>
+          <a
+            href="/?q={{ query | urlencode }}&tienda=kemik"
+            id="filter-kemik"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if tienda_activa == 'kemik' %}bg-amber-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-800{% endif %}"
+          >
+            Kemik ({{ resumen.total_kemik }})
+          </a>
+          <a
+            href="/?q={{ query | urlencode }}&tienda=pacifiko"
+            id="filter-pacifiko"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if tienda_activa == 'pacifiko' %}bg-blue-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-800{% endif %}"
+          >
+            Pacifiko ({{ resumen.total_pacifiko }})
+          </a>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+          <span>Búsquedas rápidas:</span>
+          <a href="/?q=volante+logitech" class="underline hover:text-slate-900">volante logitech</a>
+          <span>·</span>
+          <a href="/?q=G29" class="underline hover:text-slate-900">G29</a>
+          <span>·</span>
+          <a href="/?q=G923" class="underline hover:text-slate-900">G923</a>
+          <span>·</span>
+          <a href="/" class="underline hover:text-slate-900">Ver todo</a>
+        </div>
+      </div>
+
+      <!-- Notificación de Escaneo en Vivo -->
+      <div id="scan-toast" class="hidden mt-4 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-900"></div>
+    </section>
+
+    {% if error_db %}
+    <!-- Alerta de Error de Base de Datos -->
+    <div class="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <strong class="font-semibold">Error conectando a Neon DB:</strong> {{ error_db }}
+    </div>
+    {% endif %}
+
+    {% if resumen.mejor_oferta %}
+    <!-- Cinta Resumen de Comparación (KPIs) -->
+    <section class="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="rounded-xl bg-white p-4 border border-slate-200/80 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Mejor Precio Detectado</p>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-emerald-700 tabular-nums">
+            Q{{ "{:,.2f}".format(resumen.mejor_oferta.precio_gtq) }}
+          </span>
+          <span class="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
+            {{ resumen.mejor_oferta.tienda }}
+          </span>
+        </div>
+        <p class="mt-1 text-xs text-slate-500 truncate" title="{{ resumen.mejor_oferta.titulo }}">
+          {{ resumen.mejor_oferta.titulo }}
+        </p>
+      </div>
+
+      <div class="rounded-xl bg-white p-4 border border-slate-200/80 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Diferencia / Ahorro Máximo</p>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-slate-900 tabular-nums">
+            Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}
+          </span>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">
+          Amplitud de precios en la búsqueda actual
+        </p>
+      </div>
+
+      <div class="rounded-xl bg-white p-4 border border-slate-200/80 shadow-sm">
+        <p class="text-xs font-medium uppercase tracking-wider text-slate-500">Ofertas Comparadas</p>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="font-mono text-2xl font-bold text-slate-900 tabular-nums">
+            {{ resumen.total }}
+          </span>
+          <span class="text-xs text-slate-500">
+            ({{ resumen.total_kemik }} Kemik · {{ resumen.total_pacifiko }} Pacifiko)
+          </span>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">
+          Ordenadas de menor a mayor precio en GTQ
+        </p>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- Listado Comparativo de Productos -->
+    {% if ofertas %}
+    <section aria-label="Resultados de comparación" class="space-y-3">
+      {% for oferta in ofertas %}
+      {% set es_mejor = (loop.index == 1) %}
+      <article
+        class="group relative rounded-xl bg-white p-4 sm:p-5 border transition-all {% if es_mejor %}border-emerald-500/60 ring-1 ring-emerald-500/20 shadow-sm{% else %}border-slate-200/80 hover:border-slate-300 shadow-sm{% endif %}"
+      >
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+
+          <!-- Posición y Miniatura del Producto -->
+          <div class="flex items-center gap-3.5 w-full sm:w-auto">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center font-mono text-xs font-bold shrink-0 {% if es_mejor %}bg-emerald-600 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">
+              #{{ loop.index }}
+            </div>
+
+            <div class="w-16 h-16 rounded-lg bg-slate-50 border border-slate-200/60 p-1.5 flex items-center justify-center shrink-0 overflow-hidden">
+              {% if oferta.imagen_url %}
+              <img
+                src="{{ oferta.imagen_url }}"
+                alt="{{ oferta.titulo }}"
+                loading="lazy"
+                class="max-h-full max-w-full object-contain"
+              />
+              {% else %}
+              <span class="text-[10px] font-mono text-slate-400">SIN IMG</span>
+              {% endif %}
+            </div>
+
+            <!-- Precio visible en móvil -->
+            <div class="sm:hidden ml-auto text-right">
+              <div class="font-mono text-lg font-bold text-slate-900 tabular-nums">
+                Q{{ "{:,.2f}".format(oferta.precio_gtq) }}
+              </div>
+              <div class="text-[11px] text-slate-500 font-mono tabular-nums">
+                Puesto GT: Q{{ "{:,.2f}".format(oferta.costo_real_gtq) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Información Central del Producto -->
+          <div class="flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <!-- Badge de Tienda -->
+              {% if oferta.tienda_slug == 'kemik' %}
+              <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200/80">
+                Kemik
+              </span>
+              {% elif oferta.tienda_slug == 'pacifiko' %}
+              <span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200/80">
+                Pacifiko
+              </span>
+              {% else %}
+              <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                {{ oferta.tienda }}
+              </span>
+              {% endif %}
+
+              {% if es_mejor %}
+              <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200/80">
+                ★ Mejor Precio
+              </span>
+              {% endif %}
+
+              {% if oferta.marca %}
+              <span class="text-xs font-medium text-slate-400">
+                · {{ oferta.marca }}
+              </span>
+              {% endif %}
+            </div>
+
+            <h2 class="text-sm sm:text-base font-semibold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug">
+              <a href="{{ oferta.url }}" target="_blank" rel="noopener noreferrer" class="focus:outline-none">
+                {{ oferta.titulo }}
+              </a>
+            </h2>
+
+            <p class="mt-1 text-xs text-slate-400 font-mono truncate">
+              Actualizado: {{ oferta.scraped_at[:19] }} UTC
+            </p>
+          </div>
+
+          <!-- Columna Derecha: Precio en GTQ + Botón a Tienda -->
+          <div class="hidden sm:flex flex-col items-end justify-center shrink-0 text-right pl-4 border-l border-slate-100">
+            <div class="font-mono text-xl font-bold {% if es_mejor %}text-emerald-700{% else %}text-slate-900{% endif %} tabular-nums">
+              Q{{ "{:,.2f}".format(oferta.precio_gtq) }}
+            </div>
+            <div class="text-xs text-slate-500 font-mono tabular-nums mt-0.5">
+              + Q{{ "{:,.2f}".format(oferta.costo_envio_gtq) }} envío = <strong class="text-slate-700">Q{{ "{:,.2f}".format(oferta.costo_real_gtq) }}</strong>
+            </div>
+
+            <a
+              href="{{ oferta.url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-2.5 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors {% if es_mejor %}bg-emerald-600 text-white hover:bg-emerald-700{% else %}bg-slate-100 text-slate-800 hover:bg-slate-900 hover:text-white{% endif %}"
+            >
+              Ver en {{ oferta.tienda }}
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+
+    {% else %}
+    <!-- Estado Vacío -->
+    <section class="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+      <div class="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
+      </div>
+      <h2 class="text-base font-semibold text-slate-900">
+        No se encontraron ofertas en Neon DB para "{{ query }}"
+      </h2>
+      <p class="mt-1 text-sm text-slate-500 max-w-md mx-auto">
+        Puedes escanear directamente las tiendas en vivo haciendo clic en <strong>"Escanear Tiendas"</strong> o limpiar los filtros de búsqueda.
+      </p>
+      <div class="mt-5 flex justify-center gap-3">
+        <a
+          href="/"
+          class="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 transition-colors"
+        >
+          Mostrar todas las ofertas
+        </a>
+        <button
+          type="button"
+          onclick="escanearEnVivo()"
+          class="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+        >
+          Escanear "{{ query or 'volante logitech' }}" ahora
+        </button>
+      </div>
+    </section>
+    {% endif %}
+
+  </main>
+
+  <footer class="border-t border-slate-200/80 bg-white py-6 mt-12">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+      <span><strong>tecHunter</strong> — Plataforma de Comparación de Precios en Guatemala (Clean Architecture)</span>
+      <span class="font-mono">Tiendas activas: Kemik · Pacifiko | DB: Neon PostgreSQL</span>
+    </div>
+  </footer>
+
+  <script>
+    async function escanearEnVivo() {
+      const input = document.getElementById('search-input');
+      const query = (input.value || 'volante logitech').trim();
+      const btn = document.getElementById('btn-escanear-vivo');
+      const label = document.getElementById('label-scan');
+      const icon = document.getElementById('icon-scan');
+      const toast = document.getElementById('scan-toast');
+
+      btn.disabled = true;
+      icon.classList.add('animate-spin');
+      label.textContent = 'Escaneando...';
+      toast.classList.remove('hidden');
+      toast.textContent = `Consultando Kemik y Pacifiko en vivo para "${query}" e inyectando en Neon DB...`;
+
+      try {
+        const resp = await fetch('/api/escanear', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.detail || 'Error durante el escaneo');
+        }
+        toast.textContent = `¡Listo! Se extrajeron ${data.extraidos_kemik} de Kemik y ${data.extraidos_pacifiko} de Pacifiko (${data.insertados_neon} guardados en Neon DB). Recargando...`;
+        setTimeout(() => {
+          window.location.href = `/?q=${encodeURIComponent(query)}`;
+        }, 900);
+      } catch (err) {
+        toast.className = 'mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800';
+        toast.textContent = `Error al escanear: ${err.message}`;
+        btn.disabled = false;
+        icon.classList.remove('animate-spin');
+        label.textContent = 'Escanear Tiendas';
+      }
+    }
+  </script>
+</body>
+</html>

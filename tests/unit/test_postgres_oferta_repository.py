@@ -57,3 +57,52 @@ def test_guardar_ofertas_inserta_en_productos_e_historial_precios(mock_connect):
     assert ultimos_params[1] == "tienda-uuid-kemik"
     assert ultimos_params[2] == Decimal("2699.0")
     assert ultimos_params[5] == Decimal("2734.00")  # 2699.00 + 35.00 envío local
+
+
+@patch("radar_ofertas.infrastructure.db.postgres_oferta_repository.psycopg2.connect")
+def test_buscar_ofertas_comparadas_retorna_diccionarios_tipados(mock_connect):
+    cursor_mock = MagicMock()
+    cursor_mock.fetchall.return_value = [
+        (
+            "prod-1",
+            "Logitech G29 Driving Force",
+            "Logitech",
+            "https://images.kemik.gt/g29.jpg",
+            "kemik",
+            "Kemik",
+            Decimal("2699.00"),
+            Decimal("35.00"),
+            Decimal("2734.00"),
+            "https://www.kemik.gt/producto/g29",
+            "2026-11-13 21:06:04+00",
+        ),
+        (
+            "prod-2",
+            "Logitech G29 Driving Force PS4/PC",
+            "Logitech",
+            "https://img.pacifiko.com/g29.jpg",
+            "pacifiko",
+            "Pacifiko",
+            Decimal("3295.01"),
+            Decimal("35.00"),
+            Decimal("3330.01"),
+            "https://www.pacifiko.com/compras-en-linea/g29",
+            "2026-11-13 21:48:33+00",
+        ),
+    ]
+
+    conn_mock = MagicMock()
+    conn_mock.__enter__.return_value = conn_mock
+    conn_mock.cursor.return_value.__enter__.return_value = cursor_mock
+    mock_connect.return_value = conn_mock
+
+    repo = PostgresOfertaRepository(
+        database_url="postgresql://user:pass@ep-test.neon.tech/neondb?sslmode=require"
+    )
+    resultados = repo.buscar_ofertas_comparadas(query="volante logitech")
+
+    assert len(resultados) == 2
+    assert resultados[0]["tienda"] == "Kemik"
+    assert resultados[0]["precio_gtq"] == 2699.00
+    assert resultados[1]["tienda"] == "Pacifiko"
+    assert resultados[1]["precio_gtq"] == 3295.01

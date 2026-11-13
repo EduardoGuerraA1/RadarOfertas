@@ -11,6 +11,7 @@ import logging
 import os
 import urllib.request
 from decimal import Decimal
+from typing import Any
 from urllib.parse import urlparse
 
 import psycopg2
@@ -94,6 +95,11 @@ class _NeonHttpCursor:
             return fila
         return None
 
+    def fetchall(self) -> list[tuple]:
+        restantes = self._rows[self._idx :]
+        self._idx = len(self._rows)
+        return restantes
+
 
 class _NeonHttpConnection:
     """Conexión ligera sobre HTTPS para Neon Serverless cuando el puerto 5432 está bloqueado."""
@@ -115,7 +121,7 @@ class _NeonHttpConnection:
 
 
 class PostgresOfertaRepository(OfertaRepository):
-    """Repositorio PostgreSQL para persistir OfertaLocal en Neon DB."""
+    """Repositorio PostgreSQL para persistir y consultar OfertaLocal en Neon DB."""
 
     def __init__(self, database_url: str | None = None) -> None:
         self._database_url = (database_url or os.getenv("DATABASE_URL") or "").strip()
@@ -300,3 +306,79 @@ class PostgresOfertaRepository(OfertaRepository):
             return insertados
         finally:
             conn.close()
+
+    def buscar_ofertas_comparadas(
+        self, query: str = "", tienda_slug: str = ""
+    ) -> list[dict[str, Any]]:
+        """
+        Obtiene la última oferta por (producto, tienda) desde Neon DB,
+        filtrando por palabras clave y tienda opcional, ordenadas por precio ascendente.
+        """
+        tokens = [t.strip() for t in query.strip().split() if t.strip()]
+        tienda_limpia = tienda_slug.strip().lower()
+
+        condiciones = ["p.activo = TRUE", "t.activo = TRUE"]
+        params: list[Any] = []
+
+        if tienda_limpia in {"kemik", "pacifiko"}:
+            condiciones.append("t.slug = %s")
+            params.append(tienda_limpia)
+
+        for token in tokens:
+            patron = f"%{token}%"
+            condiciones.append("(p.nombre ILIKE %s OR COALESCE(p.marca, '') ILIKE %s)")
+            params.extend([patron, patron])
+
+        where_clause = " AND ".join(condiciones)
+
+        sql = f"""
+            SELECT *
+            FROM (
+                SELECT DISTINCT ON (hp.producto_id, hp.tienda_id)
+                    p.id AS producto_id,
+                    p.nombre AS titulo,
+                    COALESCE(p.marca, '') AS marca,
+                    COALESCE(p.imagen_url, '') AS imagen_url,
+                    t.slug AS tienda_slug,
+                    t.nombre AS tienda,
+                    hp.precio_nativo AS precio_gtq,
+                    hp.costo_envio_gtq AS costo_envio_gtq,
+                    hp.costo_real_gtq AS costo_real_gtq,
+                    hp.url_oferta AS url,
+                    hp.scraped_at AS scraped_at
+                FROM historial_precios hp
+                JOIN productos p ON p.id = hp.producto_id
+                JOIN tiendas t ON t.id = hp.tienda_id
+                WHERE {where_clause}
+                ORDER BY hp.producto_id, hp.tienda_id, hp.scraped_at DESC
+            ) ultimas
+            ORDER BY ultimas.precio_gtq ASC, ultimas.costo_real_gtq ASC;
+        """
+
+        conn = self._get_connection()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(sql, params)
+                    filas = cursor.fetchall()
+        finally:
+            conn.close()
+
+        resultados: list[dict[str, Any]] = []
+        for fila in filas:
+            resultados.append(
+                {
+                    "producto_id": str(fila[0]),
+                    "titulo": str(fila[1]),
+                    "marca": str(fila[2] or ""),
+                    "imagen_url": str(fila[3] or ""),
+                    "tienda_slug": str(fila[4]),
+                    "tienda": str(fila[5]),
+                    "precio_gtq": float(fila[6]),
+                    "costo_envio_gtq": float(fila[7]),
+                    "costo_real_gtq": float(fila[8]),
+                    "url": str(fila[9]),
+                    "scraped_at": str(fila[10]),
+                }
+            )
+        return resultados
