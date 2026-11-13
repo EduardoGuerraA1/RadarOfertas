@@ -1,8 +1,11 @@
 """
 Punto de entrada principal (Orquestador) de tecHunter / RadarOfertas.
-Coordina la ejecución de scrapers y la persistencia en Neon DB (PostgreSQL)
+Coordina la ejecución concurrente de los scrapers locales (Kemik y Pacifiko),
+compara los precios en Quetzales (GTQ) y persiste de forma unificada en Neon DB
 respetando la arquitectura limpia (Clean Architecture).
 """
+from __future__ import annotations
+
 import argparse
 import asyncio
 import logging
@@ -19,6 +22,7 @@ from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
+from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 
 load_dotenv()
 
@@ -32,7 +36,7 @@ logger = logging.getLogger("tecHunter.main")
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Orquestador principal de tecHunter (Scraping + Persistencia en Neon DB)."
+        description="Orquestador principal de tecHunter (Kemik + Pacifiko -> Comparación + Neon DB)."
     )
     parser.add_argument(
         "query",
@@ -49,22 +53,22 @@ def parse_args() -> argparse.Namespace:
         "--limite",
         type=int,
         default=10,
-        help="Cantidad máxima de ofertas a mostrar en consola (por defecto: 10)",
+        help="Cantidad máxima de ofertas a mostrar en el ranking comparativo (por defecto: 10)",
     )
     parser.add_argument(
         "--headed",
         action="store_true",
-        help="Abre navegador Chromium visible (headless=False) para resolver Cloudflare en entorno local",
+        help="Abre navegador Chromium visible (headless=False) en Kemik para resolver Cloudflare en entorno local",
     )
     parser.add_argument(
         "--simular",
         action="store_true",
-        help="Usa un payload JSON-LD del Volante Logitech G29 para validar mapeo e inserción en Neon DB sin red de Kemik",
+        help="Si Cloudflare bloquea Kemik en entorno cloud, usa payload de respaldo de Kemik junto con Pacifiko en vivo",
     )
     parser.add_argument(
         "--sin-db",
         action="store_true",
-        help="Solo ejecuta el scraper e imprime en consola sin insertar en Neon DB",
+        help="Solo ejecuta los scrapers y compara en consola sin insertar en Neon DB",
     )
     return parser.parse_args()
 
@@ -103,21 +107,48 @@ PAYLOAD_SIMULADO_KEMIK = [
 ]
 
 
-def mostrar_ofertas_en_consola(
-    termino: str, ofertas: list[OfertaLocal], limite: int
-) -> None:
-    print("\n" + "=" * 80)
-    print(f" RESULTADOS DE TECHUNTER - KEMIK | Búsqueda: '{termino}'")
-    print(f" Total de ofertas encontradas: {len(ofertas)} (mostrando {min(limite, len(ofertas))})")
-    print("=" * 80)
+def mostrar_comparativa_en_consola(
+    termino: str,
+    ofertas_kemik: list[OfertaLocal],
+    ofertas_pacifiko: list[OfertaLocal],
+    limite: int,
+) -> list[OfertaLocal]:
+    """
+    Ordena y muestra las ofertas de ambas tiendas de menor a mayor precio
+    y retorna la lista unificada ordenada.
+    """
+    todas_ordenadas = sorted(
+        [*ofertas_kemik, *ofertas_pacifiko], key=lambda o: o.precio_gtq
+    )
 
-    for i, oferta in enumerate(ofertas[:limite], 1):
-        print(f"[{i}] {oferta.titulo}")
-        print(f"    Tienda : {oferta.tienda}")
+    print("\n" + "=" * 85)
+    print(f" RADAR COMPARADOR TECHUNTER (GT) | Búsqueda: '{termino}'")
+    print(
+        f" Resumen por tienda: Kemik ({len(ofertas_kemik)}) | "
+        f"Pacifiko ({len(ofertas_pacifiko)}) | Total ({len(todas_ordenadas)})"
+    )
+    print("=" * 85)
+
+    if not todas_ordenadas:
+        print("No se encontraron ofertas en ninguna tienda.")
+        return []
+
+    mejor_oferta = todas_ordenadas[0]
+    print(
+        f"🏆 MEJOR PRECIO DETECTADO: Q{mejor_oferta.precio_gtq:,.2f} en [{mejor_oferta.tienda}] "
+        f"-> {mejor_oferta.titulo}"
+    )
+    print("=" * 85)
+
+    for i, oferta in enumerate(todas_ordenadas[:limite], 1):
+        etiqueta = " ⭐ [MEJOR PRECIO]" if i == 1 else ""
+        print(f"[{i}] [{oferta.tienda.upper()}]{etiqueta} {oferta.titulo}")
         print(f"    Precio : Q{oferta.precio_gtq:,.2f}")
         print(f"    URL    : {oferta.url}")
         print(f"    Imagen : {oferta.imagen_url}")
-        print("-" * 80)
+        print("-" * 85)
+
+    return todas_ordenadas
 
 
 def guardar_en_base_de_datos(
@@ -130,11 +161,13 @@ def guardar_en_base_de_datos(
         )
         return
 
-    logger.info("Conectando a Neon DB para registrar %d ofertas...", len(ofertas))
+    logger.info(
+        "Conectando a Neon DB para registrar %d ofertas unificadas...", len(ofertas)
+    )
     repositorio = PostgresOfertaRepository(database_url=database_url)
     insertados = repositorio.guardar_ofertas(ofertas, categoria_slug=categoria_slug)
     print(
-        f"\n✅ Base de Datos (Neon): Se insertaron {insertados} registros en "
+        f"\n✅ Base de Datos (Neon): Se inyectaron {insertados} ofertas unificadas en "
         "`productos` e `historial_precios`."
     )
 
@@ -143,36 +176,43 @@ async def ejecutar_orquestador() -> None:
     args = parse_args()
     termino = args.query
 
-    logger.info("Iniciando orquestador tecHunter para el término: '%s'", termino)
-    scraper = KemikScraper(headless=not args.headed)
+    logger.info(
+        "Iniciando orquestador multicapa tecHunter para el término: '%s'", termino
+    )
+    kemik_scraper = KemikScraper(headless=not args.headed)
+    pacifiko_scraper = PacifikoScraper()
 
     try:
         if args.simular:
             logger.info(
-                "Modo simulación (--simular) activo: mapeando JSON-LD de '%s' a OfertaLocal...",
-                termino,
+                "Modo --simular activo: ejecutando Pacifiko en vivo + respaldo JSON-LD de Kemik..."
             )
-            ofertas = [
+            ofertas_pacifiko = await pacifiko_scraper.buscar_producto(termino)
+            ofertas_kemik = [
                 oferta
                 for item in PAYLOAD_SIMULADO_KEMIK
-                if (oferta := scraper._mapear_producto_ld_a_oferta(item)) is not None
+                if (oferta := kemik_scraper._mapear_producto_ld_a_oferta(item))
+                is not None
             ]
         else:
-            ofertas = await scraper.buscar_producto(termino)
+            ofertas_kemik, ofertas_pacifiko = await asyncio.gather(
+                kemik_scraper.buscar_producto(termino),
+                pacifiko_scraper.buscar_producto(termino),
+            )
 
-        if not ofertas:
+        ofertas_unificadas = mostrar_comparativa_en_consola(
+            termino, ofertas_kemik, ofertas_pacifiko, args.limite
+        )
+
+        if not ofertas_unificadas:
             print(
-                f"\n⚠️ No se encontraron ofertas para '{termino}'.\n"
-                "Si estás ejecutando en tu máquina local y Cloudflare bloquea el modo headless, "
-                "prueba ejecutando:\n"
-                f'  python main.py "{termino}" --headed'
+                f"\n⚠️ No se encontraron ofertas para '{termino}' en ninguna tienda.\n"
+                f'💡 Prueba ejecutando: python main.py "{termino}" --headed'
             )
             return
 
-        mostrar_ofertas_en_consola(termino, ofertas, args.limite)
-
         if not args.sin_db:
-            guardar_en_base_de_datos(ofertas, args.categoria)
+            guardar_en_base_de_datos(ofertas_unificadas, args.categoria)
 
     except Exception as error:
         logger.error("Error crítico en el orquestador: %s", error)

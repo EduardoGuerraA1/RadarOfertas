@@ -140,15 +140,20 @@ class PostgresOfertaRepository(OfertaRepository):
     def _asegurar_tienda(cursor, nombre_tienda: str) -> tuple[str, bool, Decimal]:
         """Obtiene (o crea si no existe) el registro de la tienda en la tabla `tiendas`."""
         slug = nombre_tienda.strip().lower().replace(" ", "-")
+        urls_conocidas = {
+            "kemik": "https://www.kemik.gt",
+            "pacifiko": "https://www.pacifiko.com",
+        }
+        url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
         cursor.execute(
             """
             INSERT INTO tiendas (slug, nombre, pais, tipo, url_base, envio_gratis_default, tarifa_envio_local_gtq, moneda_nativa)
-            VALUES (%s, %s, 'GT', 'local', 'https://www.kemik.gt', FALSE, 35.00, 'GTQ')
+            VALUES (%s, %s, 'GT', 'local', %s, FALSE, 35.00, 'GTQ')
             ON CONFLICT (slug) DO UPDATE
                 SET updated_at = NOW()
             RETURNING id, envio_gratis_default, tarifa_envio_local_gtq;
             """,
-            (slug, nombre_tienda.strip()),
+            (slug, nombre_tienda.strip(), url_base),
         )
         row = cursor.fetchone()
         envio_gratis = row[1] if isinstance(row[1], bool) else str(row[1]).lower() == "true"
