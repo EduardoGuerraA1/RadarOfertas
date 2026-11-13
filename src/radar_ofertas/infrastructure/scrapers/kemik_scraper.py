@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 import random
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 from fake_useragent import UserAgent
 from playwright.async_api import (
@@ -35,12 +35,14 @@ KEMIK_BASE_URL = "https://www.kemik.gt/"
 KEMIK_SEARCH_URL_TEMPLATE = "https://www.kemik.gt/search?query={query}"
 
 NAVIGATION_TIMEOUT_MS = 30_000
+NETWORKIDLE_TIMEOUT_MS = 12_000
 
 
 class KemikScraper(BaseScraper):
     """Scraper para extraer productos del buscador de kemik.gt (Next.js + Cloudflare)."""
 
-    def __init__(self) -> None:
+    def __init__(self, headless: bool = True) -> None:
+        self._headless = headless
         try:
             self._user_agent = UserAgent(
                 browsers=["Chrome", "Edge", "Firefox"],
@@ -97,28 +99,54 @@ class KemikScraper(BaseScraper):
         return []
 
     @staticmethod
-    def _mapear_producto_ld_a_oferta(producto_ld: dict) -> OfertaLocal | None:
+    def _normalizar_imagen(imagen_raw: object) -> str:
+        """Extrae una URL de imagen válida desde un string, lista u objeto ImageObject."""
+        url_img = ""
+        if isinstance(imagen_raw, str):
+            url_img = imagen_raw.strip()
+        elif isinstance(imagen_raw, list) and imagen_raw:
+            primero = imagen_raw[0]
+            if isinstance(primero, str):
+                url_img = primero.strip()
+            elif isinstance(primero, dict):
+                url_img = str(primero.get("url") or primero.get("contentUrl") or "").strip()
+        elif isinstance(imagen_raw, dict):
+            url_img = str(imagen_raw.get("url") or imagen_raw.get("contentUrl") or "").strip()
+
+        if url_img:
+            return urljoin(KEMIK_BASE_URL, url_img)
+        return ""
+
+    @classmethod
+    def _mapear_producto_ld_a_oferta(cls, producto_ld: dict) -> OfertaLocal | None:
         """Traduce un objeto Product (schema.org) del JSON-LD a OfertaLocal."""
         try:
             titulo = producto_ld.get("name")
-            url = producto_ld.get("url")
-            if not titulo or not url:
+            url_raw = producto_ld.get("url")
+            if not titulo or not url_raw:
                 return None
+
+            url_absoluta = urljoin(KEMIK_BASE_URL, str(url_raw).strip())
 
             offers = producto_ld.get("offers") or {}
-            precio_gtq = offers.get("price")
-            if precio_gtq is None:
-                return None
-            precio_gtq = float(precio_gtq)
+            if isinstance(offers, list):
+                offers = offers[0] if offers else {}
 
-            imagen_url = producto_ld.get("image") or ""
+            precio_raw = offers.get("price") if isinstance(offers, dict) else None
+            if precio_raw is None and isinstance(offers, dict):
+                precio_raw = offers.get("lowPrice")
+            if precio_raw is None:
+                return None
+            precio_gtq = float(precio_raw)
+
+            imagen_url = cls._normalizar_imagen(producto_ld.get("image"))
 
             return OfertaLocal(
                 tienda="Kemik",
                 titulo=str(titulo).strip(),
                 precio_gtq=precio_gtq,
-                url=str(url).strip(),
-                imagen_url=str(imagen_url).strip(),
+                url=url_absoluta,
+                imagen_url=imagen_url,
             )
         except (ValueError, TypeError, AttributeError) as error:
             logger.warning("Fallo mapeando un producto de Kemik desde JSON-LD: %s", error)
@@ -138,7 +166,7 @@ class KemikScraper(BaseScraper):
 
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(
-                headless=True,
+                headless=self._headless,
                 args=["--disable-blink-features=AutomationControlled"],
             )
             context = await browser.new_context(
@@ -146,6 +174,7 @@ class KemikScraper(BaseScraper):
                 locale="es-GT",
                 viewport={"width": 1366, "height": 768},
                 extra_http_headers={"Accept-Language": "es-GT,es;q=0.9,en;q=0.8"},
+                ignore_https_errors=True,
             )
             await context.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
@@ -158,18 +187,36 @@ class KemikScraper(BaseScraper):
                 await page.goto(
                     KEMIK_BASE_URL, wait_until="domcontentloaded", timeout=NAVIGATION_TIMEOUT_MS
                 )
-                await page.wait_for_load_state("networkidle", timeout=NAVIGATION_TIMEOUT_MS)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=NETWORKIDLE_TIMEOUT_MS)
+                except PlaywrightTimeoutError:
+                    logger.debug("Kemik: networkidle en home excedió tiempo; continuando con DOM cargado.")
                 await asyncio.sleep(random.uniform(2.0, 3.0))
 
                 logger.info("Kemik: navegando a la búsqueda '%s'...", url_busqueda)
-                await page.goto(
+                response = await page.goto(
                     url_busqueda, wait_until="domcontentloaded", timeout=NAVIGATION_TIMEOUT_MS
                 )
-                await page.wait_for_load_state("networkidle", timeout=NAVIGATION_TIMEOUT_MS)
+                status_code = response.status if response else None
+                try:
+                    await page.locator('script[type="application/ld+json"]').first.wait_for(
+                        state="attached", timeout=NETWORKIDLE_TIMEOUT_MS
+                    )
+                except PlaywrightTimeoutError:
+                    logger.debug("Kemik: espera de script JSON-LD agotada; intentando lectura directa.")
                 await asyncio.sleep(random.uniform(1.0, 2.0))
 
                 productos_ld = await self._extraer_item_list_json_ld(page)
-                logger.info("Kemik: %d productos encontrados en JSON-LD.", len(productos_ld))
+                if not productos_ld:
+                    titulo_pagina = await page.title()
+                    logger.warning(
+                        "Kemik: 0 productos en JSON-LD (HTTP %s, título='%s'). "
+                        "Posible bloqueo/challenge de Cloudflare o búsqueda sin resultados.",
+                        status_code,
+                        titulo_pagina,
+                    )
+                else:
+                    logger.info("Kemik: %d productos encontrados en JSON-LD.", len(productos_ld))
 
                 for producto_ld in productos_ld:
                     oferta = self._mapear_producto_ld_a_oferta(producto_ld)
