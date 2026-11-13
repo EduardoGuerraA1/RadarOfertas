@@ -1,13 +1,17 @@
 """
 Implementación PostgreSQL (Neon DB) de OfertaRepository.
-Vive en la capa de infraestructura y utiliza psycopg2 para insertar en
-las tablas `productos` e `historial_precios` definidas en db/migrations/001_init.sql.
+Vive en la capa de infraestructura y utiliza psycopg2 (puerto 5432) con
+fallback automático al endpoint nativo SQL-over-HTTPS de Neon (puerto 443)
+cuando un firewall o proxy bloquea conexiones TCP directas al puerto 5432.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import urllib.request
 from decimal import Decimal
+from urllib.parse import urlparse
 
 import psycopg2
 from dotenv import load_dotenv
@@ -18,6 +22,96 @@ from radar_ofertas.domain.repositories.oferta_repository import OfertaRepository
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+class _NeonHttpCursor:
+    """Cursor compatible con DB-API 2.0 que ejecuta SQL sobre el endpoint HTTPS de Neon (/sql)."""
+
+    def __init__(self, database_url: str) -> None:
+        self._database_url = database_url
+        host = urlparse(database_url).hostname
+        if not host:
+            raise ValueError("DATABASE_URL no contiene un hostname válido para Neon DB.")
+        self._endpoint = f"https://{host}/sql"
+        self._rows: list[tuple] = []
+        self._idx = 0
+
+    def __enter__(self) -> _NeonHttpCursor:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        pass
+
+    @staticmethod
+    def _convertir_placeholders(query: str) -> str:
+        """Convierte marcadores %s de psycopg2 a $1, $2, ... requeridos por Neon HTTP SQL."""
+        partes = query.split("%s")
+        if len(partes) == 1:
+            return query
+        resultado = [partes[0]]
+        for i, parte in enumerate(partes[1:], 1):
+            resultado.append(f"${i}{parte}")
+        return "".join(resultado)
+
+    @staticmethod
+    def _serializar_param(valor: object) -> object:
+        if isinstance(valor, Decimal):
+            return str(valor)
+        return valor
+
+    def execute(self, query: str, params: tuple | list = ()) -> None:
+        sql_parametrizado = self._convertir_placeholders(query)
+        params_serializados = [self._serializar_param(p) for p in params]
+        payload = json.dumps(
+            {"query": sql_parametrizado, "params": params_serializados}
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            self._endpoint,
+            data=payload,
+            headers={
+                "Neon-Connection-String": self._database_url,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        fields = [f["name"] for f in data.get("fields", [])]
+        raw_rows = data.get("rows", [])
+        self._rows = [
+            tuple(row.get(col) for col in fields) if isinstance(row, dict) else tuple(row)
+            for row in raw_rows
+        ]
+        self._idx = 0
+
+    def fetchone(self) -> tuple | None:
+        if self._idx < len(self._rows):
+            fila = self._rows[self._idx]
+            self._idx += 1
+            return fila
+        return None
+
+
+class _NeonHttpConnection:
+    """Conexión ligera sobre HTTPS para Neon Serverless cuando el puerto 5432 está bloqueado."""
+
+    def __init__(self, database_url: str) -> None:
+        self._database_url = database_url
+
+    def __enter__(self) -> _NeonHttpConnection:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        pass
+
+    def cursor(self) -> _NeonHttpCursor:
+        return _NeonHttpCursor(self._database_url)
+
+    def close(self) -> None:
+        pass
 
 
 class PostgresOfertaRepository(OfertaRepository):
@@ -31,7 +125,16 @@ class PostgresOfertaRepository(OfertaRepository):
             )
 
     def _get_connection(self):
-        return psycopg2.connect(self._database_url)
+        try:
+            return psycopg2.connect(self._database_url)
+        except psycopg2.OperationalError as error:
+            if "neon.tech" in self._database_url:
+                logger.info(
+                    "Puerto 5432 restringido (%s); usando endpoint SQL-over-HTTPS de Neon (puerto 443).",
+                    str(error).splitlines()[0],
+                )
+                return _NeonHttpConnection(self._database_url)
+            raise
 
     @staticmethod
     def _asegurar_tienda(cursor, nombre_tienda: str) -> tuple[str, bool, Decimal]:
@@ -48,7 +151,8 @@ class PostgresOfertaRepository(OfertaRepository):
             (slug, nombre_tienda.strip()),
         )
         row = cursor.fetchone()
-        return str(row[0]), bool(row[1]), Decimal(str(row[2]))
+        envio_gratis = row[1] if isinstance(row[1], bool) else str(row[1]).lower() == "true"
+        return str(row[0]), envio_gratis, Decimal(str(row[2]))
 
     @staticmethod
     def _asegurar_categoria(cursor, categoria_slug: str) -> str:
@@ -101,7 +205,6 @@ class PostgresOfertaRepository(OfertaRepository):
             )
             return producto_id
 
-        # Inferir marca básica si está en el título (ej. Logitech)
         marca = "Logitech" if "logitech" in oferta.titulo.lower() else None
 
         cursor.execute(
