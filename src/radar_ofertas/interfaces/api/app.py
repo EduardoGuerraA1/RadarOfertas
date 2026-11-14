@@ -1,5 +1,5 @@
 """
-Capa de Interfaces (Web / API) de tecHunter v3.0 con FastAPI + Jinja2.
+Capa de Interfaces (Web / API) de tecHunter GT v4.0 con FastAPI + Jinja2.
 Configurada para despliegue en la nube (Render / Railway) leyendo el puerto
 dinámico desde `os.environ.get("PORT", 8000)`.
 """
@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -24,10 +25,13 @@ from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
 )
 from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
+from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
+from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
+from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
@@ -43,14 +47,14 @@ BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 
 app = FastAPI(
-    title="tecHunter v3.0 — Comparador de Precios en Guatemala",
+    title="tecHunter GT v4.0 — Comparador de Precios en Guatemala",
     description=(
         "Plataforma de comparación de precios en tiempo real "
-        "(Intelaf, Tecno Fácil, La Curacao, Tienda Claro, PriceSmart, Siman, "
-        "Elektra, iShop, Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, "
-        "La Torre, Tiendas Max y Cemaco) respaldada por Neon DB."
+        "(iStore, EPA, Novex, Intelaf, Tecno Fácil, La Curacao, Tienda Claro, "
+        "PriceSmart, Siman, Elektra, Walmart, Paiz, Maxi Despensa, Kemik, "
+        "Pacifiko, La Torre, Tiendas Max y Cemaco) respaldada por Neon DB."
     ),
-    version="3.0.0",
+    version="4.0.0",
 )
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -112,7 +116,7 @@ def _es_busqueda_computo_ztech(query: str, categoria_ui: str = "") -> bool:
     if categoria_ui.strip().lower() == "computo":
         return True
     q_lower = (query or "").strip().lower()
-    if not q_lower:
+    if not q_lower and not categoria_ui.strip():
         return True
     return any(termino in q_lower for termino in TERMINOS_ZTECH_COMPUTO)
 
@@ -138,6 +142,7 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
 
     palabras_hogar = (
         "taladro",
+        "barreno",
         "esmeriladora",
         "herramienta",
         "martillo",
@@ -147,6 +152,7 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
         "bosch",
         "dewalt",
         "stanley",
+        "makita",
         "lampara",
         "ventilador",
         "refrigeradora",
@@ -159,6 +165,31 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
         return "hogar"
 
     return "tecnologia"
+
+
+def _calcular_ahorro_preciso(ofertas: list[dict[str, Any]]) -> float:
+    """
+    Calcula el ahorro máximo comparando equipos dentro de la misma familia/modelo o
+    dentro de la misma categoría y gama para evitar comparar un equipo básico con uno profesional.
+    """
+    if len(ofertas) <= 1:
+        return 0.0
+
+    grupos: dict[str, list[float]] = defaultdict(list)
+    for o in ofertas:
+        clave = str(o.get("clave_modelo") or f"{o.get('categoria_ui', 'general')}:{o.get('gama_slug', 'media')}")
+        grupos[clave].append(float(o.get("costo_real_gtq") or o.get("precio_gtq") or 0.0))
+
+    ahorros_por_grupo = [
+        max(precios_g) - min(precios_g)
+        for precios_g in grupos.values()
+        if len(precios_g) >= 2 and (max(precios_g) - min(precios_g)) > 0
+    ]
+    if ahorros_por_grupo:
+        return round(max(ahorros_por_grupo), 2)
+
+    precios = [float(o["precio_gtq"]) for o in ofertas]
+    return round(max(precios) - min(precios), 2)
 
 
 def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
@@ -175,10 +206,18 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             1 for o in ofertas if o.get("categoria_ui") == "super-mascotas"
         ),
     }
+    conteo_gamas = {
+        "profesional": sum(1 for o in ofertas if o.get("gama_slug") == "profesional"),
+        "media": sum(1 for o in ofertas if o.get("gama_slug") == "media"),
+        "entrada": sum(1 for o in ofertas if o.get("gama_slug") == "entrada"),
+    }
 
     if not ofertas:
         return {
             "total": 0,
+            "total_istore": 0,
+            "total_epa": 0,
+            "total_novex": 0,
             "total_intelaf": 0,
             "total_tecno_facil": 0,
             "total_la_curacao": 0,
@@ -196,16 +235,22 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             "total_tiendas_max": 0,
             "total_kemik": 0,
             "conteo_categorias": conteo_categorias,
+            "conteo_gamas": conteo_gamas,
             "mejor_oferta": None,
             "ahorro_maximo_gtq": 0.0,
         }
 
-    precios = [o["precio_gtq"] for o in ofertas]
     mejor = ofertas[0]
-    ahorro = max(precios) - min(precios) if len(precios) > 1 else 0.0
+    ahorro = _calcular_ahorro_preciso(ofertas)
+    total_istore = sum(
+        1 for o in ofertas if o["tienda_slug"] in {"istore", "ishop"}
+    )
 
     return {
         "total": len(ofertas),
+        "total_istore": total_istore,
+        "total_epa": sum(1 for o in ofertas if o["tienda_slug"] == "epa"),
+        "total_novex": sum(1 for o in ofertas if o["tienda_slug"] == "novex"),
         "total_intelaf": sum(1 for o in ofertas if o["tienda_slug"] == "intelaf"),
         "total_tecno_facil": sum(
             1 for o in ofertas if o["tienda_slug"] in {"tecno-facil", "tecnofacil"}
@@ -221,7 +266,7 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "total_siman": sum(1 for o in ofertas if o["tienda_slug"] == "siman"),
         "total_elektra": sum(1 for o in ofertas if o["tienda_slug"] == "elektra"),
-        "total_ishop": sum(1 for o in ofertas if o["tienda_slug"] == "ishop"),
+        "total_ishop": total_istore,
         "total_walmart": sum(1 for o in ofertas if o["tienda_slug"] == "walmart"),
         "total_paiz": sum(1 for o in ofertas if o["tienda_slug"] == "paiz"),
         "total_maxi_despensa": sum(
@@ -235,8 +280,9 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "total_kemik": sum(1 for o in ofertas if o["tienda_slug"] == "kemik"),
         "conteo_categorias": conteo_categorias,
+        "conteo_gamas": conteo_gamas,
         "mejor_oferta": mejor,
-        "ahorro_maximo_gtq": round(ahorro, 2),
+        "ahorro_maximo_gtq": ahorro,
     }
 
 
@@ -265,7 +311,7 @@ async def _ejecutar_scraper_seguro(
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     """Endpoint de salud para el balanceador de Render."""
-    return {"status": "ok", "service": "tecHunter", "version": "3.0.0"}
+    return {"status": "ok", "service": "tecHunter", "version": "4.0.0"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -274,11 +320,19 @@ async def vista_comparador(
     q: str = Query(default="", description="Término de búsqueda en Neon DB"),
     tienda: str = Query(
         default="",
-        description="Filtro por tienda: intelaf, tecno-facil, la-curacao, tienda-claro, pricesmart, siman, elektra, ishop, walmart, paiz, maxi-despensa, cemaco, pacifiko, la-torre, tiendas-max o kemik",
+        description="Filtro por tienda: istore, epa, novex, intelaf, tecno-facil, la-curacao, tienda-claro, pricesmart, siman, elektra, walmart, paiz, maxi-despensa, cemaco, pacifiko, la-torre, tiendas-max o kemik",
     ),
     cat: str = Query(
         default="",
         description="Filtro de categoría principal: computo, smartphones, hogar, herramientas o super-mascotas",
+    ),
+    gama: str = Query(
+        default="",
+        description="Filtro por gama de especificaciones: profesional, media o entrada",
+    ),
+    orden: str = Query(
+        default="final",
+        description="Criterio de ordenamiento: 'final' (precio con envío) o 'base' (precio de lista)",
     ),
 ) -> HTMLResponse:
     error_db: str | None = None
@@ -305,9 +359,25 @@ async def vista_comparador(
             o for o in ofertas_totales if o.get("categoria_ui") == cat_limpia
         ]
     else:
-        ofertas_visibles = ofertas_totales
+        ofertas_visibles = list(ofertas_totales)
+
+    gama_limpia = gama.strip().lower()
+    if gama_limpia in {"profesional", "media", "entrada"}:
+        ofertas_visibles = [
+            o for o in ofertas_visibles if o.get("gama_slug") == gama_limpia
+        ]
+
+    orden_limpio = orden.strip().lower()
+    if orden_limpio == "base":
+        ofertas_visibles.sort(key=lambda o: (o.get("precio_gtq", 0.0), o.get("costo_real_gtq", 0.0)))
+    else:
+        ofertas_visibles.sort(key=lambda o: (o.get("costo_real_gtq", 0.0), o.get("precio_gtq", 0.0)))
 
     resumen = _calcular_resumen(ofertas_totales)
+    resumen_visible = _calcular_resumen(ofertas_visibles)
+    resumen["mejor_oferta"] = resumen_visible["mejor_oferta"]
+    resumen["ahorro_maximo_gtq"] = resumen_visible["ahorro_maximo_gtq"]
+
     destacar_ztech = _es_busqueda_computo_ztech(q, cat_limpia)
 
     return templates.TemplateResponse(
@@ -317,6 +387,8 @@ async def vista_comparador(
             "query": q,
             "tienda_activa": tienda.lower().strip(),
             "categoria_activa": cat_limpia,
+            "gama_activa": gama_limpia,
+            "orden_activo": orden_limpio if orden_limpio in {"final", "base"} else "final",
             "ofertas": ofertas_visibles,
             "resumen": resumen,
             "destacar_ztech": destacar_ztech,
@@ -330,16 +402,21 @@ async def api_listar_ofertas(
     q: str = Query(default="", description="Término de búsqueda"),
     tienda: str = Query(default="", description="Filtro opcional de tienda"),
     cat: str = Query(default="", description="Filtro opcional de categoría UI"),
+    gama: str = Query(default="", description="Filtro opcional de gama: profesional, media, entrada"),
 ) -> dict[str, Any]:
     try:
         repositorio = PostgresOfertaRepository()
         ofertas = await asyncio.to_thread(
             repositorio.buscar_ofertas_comparadas, q, tienda, cat
         )
+        gama_limpia = gama.strip().lower()
+        if gama_limpia in {"profesional", "media", "entrada"}:
+            ofertas = [o for o in ofertas if o.get("gama_slug") == gama_limpia]
         return {
             "query": q,
             "tienda": tienda,
             "categoria_ui": cat,
+            "gama": gama_limpia,
             "destacar_ztech": _es_busqueda_computo_ztech(q, cat),
             "resumen": _calcular_resumen(ofertas),
             "ofertas": ofertas,
@@ -352,8 +429,8 @@ async def api_listar_ofertas(
 @app.post("/api/escanear")
 async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
     """
-    Ejecuta todos los scrapers v3.0 en paralelo con aislamiento de fallos, timeouts
-    individuales y Filtro Inteligente Anti-Ruido. Devuelve SIEMPRE un JSON
+    Ejecuta todos los scrapers v4.0 en paralelo con aislamiento de fallos, timeouts
+    individuales y el Motor de Precisión de Modelos. Devuelve SIEMPRE un JSON
     estructurado (`status`, `nuevas_ofertas`) para evitar errores de parseo.
     """
     try:
@@ -386,6 +463,9 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         intelaf_scraper = IntelafScraper(headless=True, timeout_s=8)
         lacuracao_scraper = LaCuracaoScraper(timeout_s=10)
         claro_scraper = ClaroScraper(timeout_s=10)
+        istore_scraper = IStoreScraper(timeout_s=10)
+        epa_scraper = EpaScraper(timeout_s=10)
+        novex_scraper = NovexScraper(timeout_s=10)
 
         resultados = await asyncio.gather(
             _ejecutar_scraper_seguro(kemik_scraper, "Kemik", termino, timeout_s=8.0),
@@ -423,6 +503,15 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
             _ejecutar_scraper_seguro(
                 claro_scraper, "Tienda Claro", termino, timeout_s=12.0
             ),
+            _ejecutar_scraper_seguro(
+                istore_scraper, "iStore", termino, timeout_s=10.0
+            ),
+            _ejecutar_scraper_seguro(
+                epa_scraper, "EPA", termino, timeout_s=12.0
+            ),
+            _ejecutar_scraper_seguro(
+                novex_scraper, "Novex", termino, timeout_s=10.0
+            ),
         )
 
         (ofertas_kemik, err_kemik) = resultados[0]
@@ -437,6 +526,9 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         (ofertas_intelaf, err_intelaf) = resultados[9]
         (ofertas_lacuracao, err_lacuracao) = resultados[10]
         (ofertas_claro, err_claro) = resultados[11]
+        (ofertas_istore, err_istore) = resultados[12]
+        (ofertas_epa, err_epa) = resultados[13]
+        (ofertas_novex, err_novex) = resultados[14]
 
         advertencias = [
             err
@@ -453,11 +545,17 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
                 err_intelaf,
                 err_lacuracao,
                 err_claro,
+                err_istore,
+                err_epa,
+                err_novex,
             )
             if err is not None
         ]
 
         unificadas_brutas = [
+            *ofertas_istore,
+            *ofertas_epa,
+            *ofertas_novex,
             *ofertas_kemik,
             *ofertas_pacifiko,
             *ofertas_super,
@@ -500,6 +598,9 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
                 "descartados_ruido": descartados_ruido,
                 "query": termino,
                 "categoria": categoria,
+                "extraidos_istore": len(ofertas_istore),
+                "extraidos_epa": len(ofertas_epa),
+                "extraidos_novex": len(ofertas_novex),
                 "extraidos_kemik": len(ofertas_kemik),
                 "extraidos_pacifiko": len(ofertas_pacifiko),
                 "extraidos_la_torre": len(ofertas_super),

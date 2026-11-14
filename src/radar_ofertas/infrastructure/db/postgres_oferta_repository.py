@@ -19,7 +19,10 @@ from dotenv import load_dotenv
 
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
 from radar_ofertas.domain.repositories.oferta_repository import OfertaRepository
-from radar_ofertas.domain.services.filtro_relevancia import filtrar_dicts_relevantes
+from radar_ofertas.domain.services.filtro_relevancia import (
+    extraer_especificaciones_y_gama,
+    filtrar_dicts_relevantes,
+)
 
 load_dotenv()
 
@@ -167,12 +170,15 @@ class PostgresOfertaRepository(OfertaRepository):
             "tienda-claro": "https://www.claro.com.gt",
             "intelaf": "https://www.intelaf.com",
             "cemaco": "https://www.cemaco.com",
+            "epa": "https://gt.epaenlinea.com",
+            "novex": "https://www.novex.com.gt",
             "walmart": "https://www.walmart.com.gt",
             "paiz": "https://www.paiz.com.gt",
             "maxi-despensa": "https://www.maxidespensa.com.gt",
             "siman": "https://gt.siman.com",
             "elektra": "https://www.elektra.com.gt",
             "ishop": "https://ishop.gt",
+            "istore": "https://ishop.gt",
             "pricesmart": "https://www.pricesmart.com/en-GT",
         }
         url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
@@ -210,12 +216,12 @@ class PostgresOfertaRepository(OfertaRepository):
     @staticmethod
     def clasificar_categoria_ui(titulo: str, tienda_slug: str = "") -> str:
         """
-        Clasifica cualquier producto en una de las 5 Categorías Principales de tecHunter v3.0:
+        Clasifica cualquier producto en una de las 5 Categorías Principales de tecHunter v4.0:
           - 'computo'        -> 💻 Cómputo y Laptops
           - 'smartphones'    -> 📱 Smartphones
-          - 'hogar'          -> 🏠 Línea Blanca y Hogar
-          - 'herramientas'   -> 🔨 Herramientas
-          - 'super-mascotas' -> 🛒 Súper y Mascotas
+          - 'hogar'          -> 🧊 Línea Blanca y Hogar
+          - 'herramientas'   -> 🔧 Herramientas
+          - 'super-mascotas' -> 🧺 Supermercado y Mascotas
         """
         t = (titulo or "").lower()
         s = (tienda_slug or "").lower()
@@ -245,6 +251,7 @@ class PostgresOfertaRepository(OfertaRepository):
             k in t
             for k in (
                 "taladro",
+                "barreno",
                 "esmeriladora",
                 "martillo",
                 "destornillador",
@@ -257,6 +264,7 @@ class PostgresOfertaRepository(OfertaRepository):
                 "dewalt",
                 "makita",
                 "stanley",
+                "bosch",
                 "black+decker",
                 "black and decker",
                 "black & decker",
@@ -265,8 +273,11 @@ class PostgresOfertaRepository(OfertaRepository):
                 "soldadora",
                 "rotomartillo",
                 "atornillador",
+                "hidrolavadora",
+                "karcher",
+                "kärcher",
             )
-        ):
+        ) or s in {"epa", "novex"}:
             return "herramientas"
 
         if any(
@@ -642,17 +653,23 @@ class PostgresOfertaRepository(OfertaRepository):
             "tienda-claro",
             "intelaf",
             "cemaco",
+            "epa",
+            "novex",
             "walmart",
             "paiz",
             "maxi-despensa",
             "siman",
             "elektra",
             "ishop",
+            "istore",
             "pricesmart",
         }:
             if tienda_limpia == "tecno-facil":
                 condiciones.append("t.slug IN (%s, %s)")
                 params.extend(["tecno-facil", "tecnofacil"])
+            elif tienda_limpia in {"istore", "ishop"}:
+                condiciones.append("t.slug IN (%s, %s)")
+                params.extend(["istore", "ishop"])
             else:
                 condiciones.append("t.slug = %s")
                 params.append(tienda_limpia)
@@ -703,22 +720,31 @@ class PostgresOfertaRepository(OfertaRepository):
             slug_tienda_str = str(fila[4])
             if slug_tienda_str == "tecnofacil":
                 slug_tienda_str = "tecno-facil"
+            precio_float = float(fila[6])
             cat_ui = self.clasificar_categoria_ui(titulo_str, slug_tienda_str)
+            meta_modelo = extraer_especificaciones_y_gama(
+                titulo_str, precio_gtq=precio_float, categoria_ui=cat_ui
+            )
+            marca_str = str(fila[2] or "") or (self._inferir_marca(titulo_str) or "Oficial GT")
             resultados.append(
                 {
                     "producto_id": str(fila[0]),
                     "titulo": titulo_str,
-                    "marca": str(fila[2] or ""),
+                    "marca": marca_str,
                     "imagen_url": str(fila[3] or ""),
                     "tienda_slug": slug_tienda_str,
                     "tienda": str(fila[5]),
-                    "precio_gtq": float(fila[6]),
+                    "precio_gtq": precio_float,
                     "costo_envio_gtq": float(fila[7]),
                     "costo_real_gtq": float(fila[8]),
                     "url": str(fila[9]),
                     "scraped_at": str(fila[10]),
                     "categoria_ui": cat_ui,
                     "requiere_membresia": slug_tienda_str == "pricesmart",
+                    "gama": meta_modelo["gama"],
+                    "gama_slug": meta_modelo["gama_slug"],
+                    "chips_especificaciones": meta_modelo["chips_especificaciones"],
+                    "clave_modelo": meta_modelo["clave_modelo"],
                 }
             )
 

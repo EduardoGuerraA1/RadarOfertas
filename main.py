@@ -1,14 +1,23 @@
 """
-Punto de entrada principal (Orquestador) de tecHunter / RadarOfertas.
+Punto de entrada principal (Orquestador) de tecHunter GT v4.0 / RadarOfertas.
 Coordina la ejecución concurrente de los scrapers locales en Guatemala:
-  - Kemik (kemik.gt)
+  - iStore / iShop GT (ishop.gt)
+  - EPA Guatemala (gt.epaenlinea.com)
+  - Novex Guatemala (novex.com.gt)
+  - Intelaf (intelaf.com)
+  - Tecno Fácil (tecnofacil.com.gt)
+  - La Curacao (lacuracaonline.com/guatemala)
+  - Tienda Claro GT (claro.com.gt)
+  - PriceSmart GT (pricesmart.com/en-GT)
+  - Tiendas Oficiales (Siman, Elektra, iShop)
+  - Grupo Walmart (walmart.com.gt, paiz.com.gt y maxidespensa.com.gt)
+  - Cemaco (cemaco.com)
   - Pacifiko (pacifiko.com)
   - Supermercados La Torre (latorre.com.gt)
-  - Tiendas Max / Tecno Fácil (max.com.gt / tecnofacil.com.gt)
-  - Cemaco (cemaco.com)
-  - Grupo Walmart (walmart.com.gt, paiz.com.gt y maxidespensa.com.gt)
-Aplica el Filtro Inteligente Anti-Ruido, compara precios en Quetzales (GTQ)
-y persiste de forma optimizada (solo cambios de precio) en Neon DB.
+  - Tiendas Max (max.com.gt)
+  - Kemik (kemik.gt)
+Aplica el Motor de Precisión de Modelos y Filtro Inteligente Anti-Ruido, compara precios
+en Quetzales (GTQ) y persiste de forma optimizada (solo cambios de precio) en Neon DB.
 """
 from __future__ import annotations
 
@@ -24,16 +33,22 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
-from radar_ofertas.domain.services.filtro_relevancia import filtrar_ofertas_relevantes
+from radar_ofertas.domain.services.filtro_relevancia import (
+    extraer_especificaciones_y_gama,
+    filtrar_ofertas_relevantes,
+)
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
 from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
+from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
+from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
+from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
@@ -74,6 +89,7 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
 
     palabras_hogar = (
         "taladro",
+        "barreno",
         "esmeriladora",
         "herramienta",
         "martillo",
@@ -83,6 +99,7 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
         "bosch",
         "dewalt",
         "stanley",
+        "makita",
         "lampara",
         "ventilador",
         "refrigeradora",
@@ -100,16 +117,16 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Orquestador principal de tecHunter v3.0 "
-            "(Intelaf + Tecno Fácil + La Curacao + Tienda Claro + PriceSmart + "
-            "Siman/Elektra/iShop + Grupo Walmart + Cemaco + Pacifiko + La Torre + Max + Kemik)."
+            "Orquestador principal de tecHunter GT v4.0 "
+            "(iStore + EPA + Novex + Intelaf + Tecno Fácil + La Curacao + Tienda Claro + "
+            "PriceSmart + Siman/Elektra + Grupo Walmart + Cemaco + Pacifiko + La Torre + Max + Kemik)."
         )
     )
     parser.add_argument(
         "query",
         nargs="?",
         default="laptop",
-        help="Término de búsqueda (ej. 'laptop', 'samsung', 'refrigeradora', 'pedigree', 'taladro')",
+        help="Término de búsqueda (ej. 'macbook air m2', 'taladro', 'iphone 16', 'samsung', 'pedigree')",
     )
     parser.add_argument(
         "--categoria",
@@ -233,13 +250,19 @@ def mostrar_comparativa_en_consola(
     ofertas_intelaf: list[OfertaLocal],
     ofertas_lacuracao: list[OfertaLocal],
     ofertas_claro: list[OfertaLocal],
+    ofertas_istore: list[OfertaLocal],
+    ofertas_epa: list[OfertaLocal],
+    ofertas_novex: list[OfertaLocal],
     limite: int,
 ) -> list[OfertaLocal]:
     """
-    Aplica el Filtro Inteligente Anti-Ruido, ordena y muestra las ofertas de todas
-    las tiendas de menor a mayor precio y retorna la lista unificada relevante.
+    Aplica el Motor de Precisión de Modelos y Filtro Inteligente Anti-Ruido, ordena y
+    muestra las ofertas de todas las tiendas de menor a mayor precio.
     """
     brutas = [
+        *ofertas_istore,
+        *ofertas_epa,
+        *ofertas_novex,
         *ofertas_kemik,
         *ofertas_pacifiko,
         *ofertas_super,
@@ -260,16 +283,19 @@ def mostrar_comparativa_en_consola(
     ]
     todas_ordenadas = sorted(relevantes, key=lambda o: o.precio_gtq)
 
-    print("\n" + "=" * 105)
-    print(f" RADAR COMPARADOR TECHUNTER v3.0 (GT) | Búsqueda: '{termino}'")
+    print("\n" + "=" * 110)
+    print(f" RADAR COMPARADOR TECHUNTER GT v4.0 | Búsqueda: '{termino}'")
     print(
         f" Resumen: "
+        f"EPA ({sum(1 for o in todas_ordenadas if o.tienda == 'EPA')}) | "
+        f"Novex ({sum(1 for o in todas_ordenadas if o.tienda == 'Novex')}) | "
+        f"iStore ({sum(1 for o in todas_ordenadas if o.tienda in {'iStore', 'iShop'})}) | "
         f"Intelaf ({sum(1 for o in todas_ordenadas if o.tienda == 'Intelaf')}) | "
         f"La Curacao ({sum(1 for o in todas_ordenadas if o.tienda == 'La Curacao')}) | "
         f"Claro ({sum(1 for o in todas_ordenadas if o.tienda == 'Tienda Claro')}) | "
         f"Tecno Fácil ({sum(1 for o in todas_ordenadas if o.tienda == 'Tecno Fácil')}) | "
         f"PriceSmart ({sum(1 for o in todas_ordenadas if o.tienda == 'PriceSmart')}) | "
-        f"Siman/Elektra/iShop ({sum(1 for o in todas_ordenadas if o.tienda in {'Siman', 'Elektra', 'iShop'})}) | "
+        f"Siman/Elektra ({sum(1 for o in todas_ordenadas if o.tienda in {'Siman', 'Elektra'})}) | "
         f"Walmart/Paiz/Maxi ({sum(1 for o in todas_ordenadas if o.tienda in {'Walmart', 'Paiz', 'Maxi Despensa'})}) | "
         f"Cemaco ({sum(1 for o in todas_ordenadas if o.tienda == 'Cemaco')}) | "
         f"Pacifiko ({sum(1 for o in todas_ordenadas if o.tienda == 'Pacifiko')}) | "
@@ -278,7 +304,7 @@ def mostrar_comparativa_en_consola(
         f"Kemik ({sum(1 for o in todas_ordenadas if o.tienda == 'Kemik')}) | "
         f"Total ({len(todas_ordenadas)} de {len(brutas)} brutas)"
     )
-    print("=" * 105)
+    print("=" * 110)
 
     if not todas_ordenadas:
         print("No se encontraron ofertas principales en ninguna tienda.")
@@ -289,16 +315,19 @@ def mostrar_comparativa_en_consola(
         f"🏆 MEJOR PRECIO DETECTADO: Q{mejor_oferta.precio_gtq:,.2f} en [{mejor_oferta.tienda}] "
         f"-> {mejor_oferta.titulo}"
     )
-    print("=" * 105)
+    print("=" * 110)
 
     for i, oferta in enumerate(todas_ordenadas[:limite], 1):
+        meta = extraer_especificaciones_y_gama(oferta.titulo, float(oferta.precio_gtq))
         etiqueta = " ⭐ [MEJOR PRECIO]" if i == 1 else ""
         nota_socio = " [SOCIO PRICESMART]" if oferta.requiere_membresia else ""
-        print(f"[{i}] [{oferta.tienda.upper()}]{nota_socio}{etiqueta} {oferta.titulo}")
-        print(f"    Precio : Q{oferta.precio_gtq:,.2f}")
+        chips_str = " · ".join(meta["chips_especificaciones"])
+        print(
+            f"[{i}] [{oferta.tienda.upper()}] [{meta['gama']}]{nota_socio}{etiqueta} {oferta.titulo}"
+        )
+        print(f"    Precio : Q{oferta.precio_gtq:,.2f} | Specs: {chips_str}")
         print(f"    URL    : {oferta.url}")
-        print(f"    Imagen : {oferta.imagen_url}")
-        print("-" * 105)
+        print("-" * 110)
 
     return todas_ordenadas
 
@@ -332,7 +361,7 @@ async def ejecutar_orquestador() -> None:
     categoria = _detectar_categoria(termino, args.categoria)
 
     logger.info(
-        "Iniciando orquestador multicapa tecHunter v3.0 para el término: '%s' (categoría: '%s')",
+        "Iniciando orquestador multicapa tecHunter GT v4.0 para el término: '%s' (categoría: '%s')",
         termino,
         categoria,
     )
@@ -352,11 +381,14 @@ async def ejecutar_orquestador() -> None:
     intelaf_scraper = IntelafScraper(headless=not args.headed)
     lacuracao_scraper = LaCuracaoScraper()
     claro_scraper = ClaroScraper()
+    istore_scraper = IStoreScraper()
+    epa_scraper = EpaScraper()
+    novex_scraper = NovexScraper()
 
     try:
         if args.simular:
             logger.info(
-                "Modo --simular activo: consultando Intelaf, La Curacao, Claro, Tecno Fácil, PriceSmart, Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko y La Torre en vivo..."
+                "Modo --simular activo: consultando iStore, EPA, Novex, Intelaf, La Curacao, Claro, Tecno Fácil, PriceSmart, Siman, Elektra, Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko y La Torre en vivo..."
             )
             (
                 ofertas_pacifiko,
@@ -369,6 +401,9 @@ async def ejecutar_orquestador() -> None:
                 ofertas_intelaf,
                 ofertas_lacuracao,
                 ofertas_claro,
+                ofertas_istore,
+                ofertas_epa,
+                ofertas_novex,
             ) = await asyncio.gather(
                 pacifiko_scraper.buscar_producto(termino),
                 super_scraper.buscar_producto(termino),
@@ -380,6 +415,9 @@ async def ejecutar_orquestador() -> None:
                 intelaf_scraper.buscar_producto(termino),
                 lacuracao_scraper.buscar_producto(termino),
                 claro_scraper.buscar_producto(termino),
+                istore_scraper.buscar_producto(termino),
+                epa_scraper.buscar_producto(termino),
+                novex_scraper.buscar_producto(termino),
             )
             termino_lower = termino.lower()
             ofertas_kemik = (
@@ -414,6 +452,9 @@ async def ejecutar_orquestador() -> None:
                 ofertas_intelaf,
                 ofertas_lacuracao,
                 ofertas_claro,
+                ofertas_istore,
+                ofertas_epa,
+                ofertas_novex,
             ) = await asyncio.gather(
                 kemik_scraper.buscar_producto(termino),
                 pacifiko_scraper.buscar_producto(termino),
@@ -427,6 +468,9 @@ async def ejecutar_orquestador() -> None:
                 intelaf_scraper.buscar_producto(termino),
                 lacuracao_scraper.buscar_producto(termino),
                 claro_scraper.buscar_producto(termino),
+                istore_scraper.buscar_producto(termino),
+                epa_scraper.buscar_producto(termino),
+                novex_scraper.buscar_producto(termino),
             )
 
         ofertas_unificadas = mostrar_comparativa_en_consola(
@@ -443,6 +487,9 @@ async def ejecutar_orquestador() -> None:
             ofertas_intelaf,
             ofertas_lacuracao,
             ofertas_claro,
+            ofertas_istore,
+            ofertas_epa,
+            ofertas_novex,
             args.limite,
         )
 
