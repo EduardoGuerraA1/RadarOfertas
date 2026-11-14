@@ -68,6 +68,16 @@ PALABRAS_NEGATIVAS_ACCESORIOS: tuple[str, ...] = (
     "repuesto",
     "repuestos",
     "forro",
+    # Laptops / Cómputo (mochilas, mesas plegables, bases enfriadoras)
+    "mochila",
+    "mochilas",
+    "bolso",
+    "maletin",
+    "mesa plegable",
+    "mesa mainstays",
+    "ventilador de laptop",
+    "base enfriadora",
+    "cooling pad",
     # Herramientas / Taladros (repuestos y accesorios menores)
     "carbones",
     "carbon para",

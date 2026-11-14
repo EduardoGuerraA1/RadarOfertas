@@ -1,760 +1,830 @@
 <!DOCTYPE html>
-<html lang="es-GT" class="h-full dark antialiased">
+<html lang="es" class="dark h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>tecHunter GT — Inteligencia y Comparación de Precios en Guatemala</title>
-  <meta name="description" content="Plataforma de comparación de precios en tiempo real en Guatemala: Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, La Torre, Tiendas Max, Cemaco y PriceSmart." />
-
-  <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-  <!-- Tailwind CSS CDN -->
+  <title>tecHunter v3.0 — Intelligence &amp; Price Radar Guatemala</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
           },
           colors: {
             obsidian: {
-              950: '#090B0E',
-              900: '#0E1116',
-              850: '#13171F',
-              800: '#181D27',
-              700: '#232A38',
-            },
-          },
-        },
-      },
-    };
+              950: '#08090C',
+              900: '#0D0F14',
+              850: '#12151C',
+              800: '#171B24',
+              700: '#232936',
+            }
+          }
+        }
+      }
+    }
   </script>
   <style>
-    :root {
-      color-scheme: dark;
-    }
     body {
-      background-color: #090B0E;
-      color: #F3F4F6;
-      background-image: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.035) 0%, transparent 60%);
+      background-color: #08090C;
+      background-image:
+        radial-gradient(at 15% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 45%),
+        radial-gradient(at 85% 5%, rgba(56, 189, 248, 0.06) 0px, transparent 45%),
+        radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.04) 0px, transparent 50%);
+      background-attachment: fixed;
     }
-    .tabular-nums {
-      font-variant-numeric: tabular-nums;
+    .glass-panel {
+      background: rgba(18, 21, 28, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
-    .surface-card {
-      background-color: #11151C;
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+    .best-price-glow {
+      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.45), 0 14px 40px -10px rgba(16, 185, 129, 0.20);
     }
-    .surface-card:hover {
-      background-color: #151A23;
-      border-color: rgba(255, 255, 255, 0.14);
+    .ztech-glow {
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.32), 0 16px 40px -12px rgba(56, 189, 248, 0.16);
     }
-    .surface-card-best {
-      background: linear-gradient(180deg, rgba(16, 185, 129, 0.06) 0%, #11151C 100%);
-      border: 1px solid rgba(52, 211, 153, 0.35);
+    .nova-glow {
+      box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.28), 0 16px 40px -12px rgba(16, 185, 129, 0.14);
     }
-    .surface-card-best:hover {
-      border-color: rgba(52, 211, 153, 0.55);
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
     }
-    .native-ad-ztech {
-      background: linear-gradient(135deg, #111622 0%, #0D1118 100%);
-      border: 1px solid rgba(56, 189, 248, 0.24);
-    }
-    .native-ad-nova {
-      background: linear-gradient(135deg, #12151C 0%, #0D1015 100%);
-      border: 1px solid rgba(245, 158, 11, 0.22);
-    }
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #090B0E;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #232A38;
-      border-radius: 4px;
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
   </style>
 </head>
-<body class="min-h-full flex flex-col selection:bg-emerald-500/20 selection:text-emerald-200">
+<body class="min-h-full flex flex-col text-zinc-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
 
-  <!-- Barra Superior Minimalista / Quiet Luxury -->
-  <header class="sticky top-0 z-30 bg-[#090B0E]/85 backdrop-blur-xl border-b border-white/[0.07]">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-      <a href="/" id="brand-logo" class="flex items-center gap-3 group focus:outline-none">
-        <div class="w-9 h-9 rounded-lg bg-white/[0.06] border border-white/[0.12] text-white flex items-center justify-center font-mono font-semibold text-xs tracking-wider group-hover:border-emerald-400/50 group-hover:text-emerald-300 transition-colors">
+  <!-- Barra Superior Minimalista (Quiet Luxury v3.0) -->
+  <header class="sticky top-0 z-30 border-b border-white/[0.06] glass-panel">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400/20 via-emerald-500/10 to-transparent border border-emerald-400/30 flex items-center justify-center text-emerald-400 font-display font-bold text-sm tracking-tight shadow-inner group-hover:border-emerald-400/60 transition">
           tH
         </div>
-        <div class="flex items-baseline gap-2">
-          <span class="font-semibold text-base tracking-tight text-zinc-100">tecHunter</span>
-          <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-400 border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 rounded">
-            GT · v2.5
-          </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-display font-bold tracking-tight text-base text-white">tecHunter</span>
+            <span class="text-[10px] uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 font-semibold">GT · v3.0</span>
+          </div>
+          <p class="text-[11px] text-zinc-500 hidden sm:block">16 Tiendas en Tiempo Real · Clean Architecture · Neon DB</p>
         </div>
       </a>
 
       <div class="flex items-center gap-2.5 text-xs">
-        <span class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/[0.03] text-zinc-400 border border-white/[0.07]" title="Descarta automáticamente correas, micas, estuches, carbones y accesorios irrelevantes">
-          <span class="w-1.5 h-1.5 rounded-full bg-amber-400/90"></span>
-          Filtro Anti-Ruido Activo
+        <a
+          href="https://ztechgt.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sky-500/10 border border-sky-400/25 text-sky-300 hover:bg-sky-500/20 transition font-medium"
+        >
+          <span>💻 Z-Tech Imports</span>
+          <span class="text-[10px] text-sky-400/80">ztechgt.com ↗</span>
+        </a>
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.07] text-zinc-400 font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Filtro Anti-Ruido Activo</span>
         </span>
-        <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-950/50 text-emerald-300/90 border border-emerald-500/20 font-medium">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          Neon DB Sync
-        </span>
-        <a href="/docs" target="_blank" id="api-docs-link" class="px-2.5 py-1 rounded-md border border-white/[0.08] bg-white/[0.02] text-zinc-300 hover:text-white hover:border-white/[0.18] transition-colors font-mono text-[11px]">
-          API ↗
+        <a
+          href="/api/ofertas?q={{ query | urlencode }}&tienda={{ tienda_activa | urlencode }}&cat={{ categoria_activa | urlencode }}"
+          target="_blank"
+          class="px-3 py-1.5 rounded-full bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.08] text-zinc-300 transition font-mono text-[11px]"
+        >
+          JSON API
         </a>
       </div>
     </div>
   </header>
 
-  <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+  <!-- Contenido Principal -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
 
-    <!-- Cabecera Editorial y Buscador Principal -->
-    <section class="mb-7">
-      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-400 mb-1.5">
-            Índice Multi-Tienda &amp; Distribuidores Oficiales (GTQ)
-          </p>
-          <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-100">
-            Comparador de Precios en Tiempo Real
-          </h1>
-        </div>
-        <p class="text-xs sm:text-sm text-zinc-400 max-w-md">
-          Monitoreo oficial en <span class="text-zinc-200 font-medium">Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, La Torre, Max, Cemaco y PriceSmart</span>.
-        </p>
+    <!-- Hero + Buscador Principal -->
+    <section class="max-w-4xl mx-auto text-center mb-8">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.07] text-[11px] text-zinc-400 mb-4 tracking-wide uppercase">
+        <span>Intelaf</span>
+        <span class="text-zinc-700">•</span>
+        <span>La Curacao</span>
+        <span class="text-zinc-700">•</span>
+        <span>Claro GT</span>
+        <span class="text-zinc-700">•</span>
+        <span>Tecno Fácil</span>
+        <span class="text-zinc-700">•</span>
+        <span>PriceSmart</span>
+        <span class="text-zinc-700">•</span>
+        <span>Siman · Elektra · iShop</span>
+        <span class="text-zinc-700">•</span>
+        <span>Walmart · Cemaco · Pacifiko</span>
       </div>
 
-      <!-- Barra de Búsqueda e Inyección en Vivo -->
-      <form action="/" method="GET" id="search-form" class="mt-6 flex flex-col sm:flex-row gap-2.5">
-        {% if tienda_activa %}
-        <input type="hidden" name="tienda" value="{{ tienda_activa }}" />
-        {% endif %}
+      <h1 class="font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.12]">
+        Compara precios reales en <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-sky-300">Quetzales</span>
+      </h1>
+      <p class="mt-2.5 text-sm sm:text-base text-zinc-400 max-w-2xl mx-auto font-normal">
+        Hardware, smartphones, línea blanca, herramientas y mayoreo en Guatemala. Sin accesorios basura y con historial inteligente en Neon DB.
+      </p>
 
+      <!-- Barra de Búsqueda + Escanear -->
+      <form action="/" method="get" id="search-form" class="mt-6 flex flex-col sm:flex-row gap-2.5">
+        <input type="hidden" name="cat" id="hidden-cat-input" value="{{ categoria_activa }}" />
         <div class="relative flex-1">
-          <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-zinc-500">
-            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
-            </svg>
-          </div>
+          <svg class="w-5 h-5 text-zinc-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+          </svg>
           <input
-            type="search"
-            id="search-input"
+            id="input-query"
+            type="text"
             name="q"
             value="{{ query }}"
-            oninput="evaluarBannerZTechDinamico(this.value)"
-            placeholder="Buscar smartphones, laptops, pantallas LG/Samsung, hogar o supermercado..."
-            class="block w-full rounded-xl border border-white/[0.10] bg-[#11151C] py-3 pl-11 pr-12 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:bg-[#141922] focus:outline-none transition-all"
+            placeholder="Busca un producto principal (ej. laptop, samsung, refrigeradora, taladro, pedigree)..."
+            class="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-obsidian-850/90 border border-white/[0.09] text-white placeholder-zinc-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/50 transition shadow-inner"
           />
-          <kbd class="hidden sm:inline-flex items-center absolute right-3.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-white/[0.04] border border-white/[0.07] rounded">
-            /
-          </kbd>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button
-            type="submit"
-            id="btn-buscar-db"
-            class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-100 px-5 py-3 text-sm font-semibold text-zinc-950 hover:bg-white focus:outline-none transition-colors"
-          >
-            Consultar DB
-          </button>
+        <button
+          type="submit"
+          class="px-6 py-3.5 rounded-2xl bg-white text-obsidian-950 font-display font-semibold text-sm hover:bg-zinc-200 transition shadow-sm"
+        >
+          Buscar
+        </button>
 
-          <button
-            type="button"
-            id="btn-escanear-vivo"
-            onclick="escanearEnVivo()"
-            title="Ejecuta los scrapers oficiales y de retail en vivo, filtra accesorios y guarda solo cambios de precio en Neon DB"
-            class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-[#141922] px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-[#1B212D] hover:border-white/[0.22] focus:outline-none transition-colors"
-          >
-            <svg id="icon-scan" class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            <span id="label-scan">Escanear Tiendas</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          id="btn-escanear"
+          onclick="escanearEnVivo()"
+          class="px-5 py-3.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-display font-semibold text-sm transition flex items-center justify-center gap-2"
+          title="Ejecuta todos los scrapers en vivo e inyecta solo variaciones de precio en Neon DB"
+        >
+          <svg id="icon-escanear" class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span id="texto-escanear">Escanear Tiendas</span>
+        </button>
       </form>
 
-      <!-- Filtros por Tienda y Accesos Rápidos -->
-      <div class="mt-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
-        <div class="flex flex-wrap items-center gap-1.5 text-xs">
-          <span class="font-mono text-[11px] uppercase tracking-wider text-zinc-500 mr-1">Tiendas:</span>
-
-          <a
-            href="/?q={{ query | urlencode }}"
-            id="filter-all"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if not tienda_activa %}bg-zinc-100 text-zinc-950 font-semibold{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.15]{% endif %}"
-          >
-            Todas <span class="font-mono text-[11px] opacity-75">({{ resumen.total }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=siman"
-            id="filter-siman"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'siman' %}bg-rose-500/20 text-rose-200 border border-rose-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-rose-300 hover:border-rose-500/30{% endif %}"
-          >
-            Siman <span class="font-mono text-[11px] opacity-75">({{ resumen.total_siman }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=elektra"
-            id="filter-elektra"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'elektra' %}bg-amber-500/20 text-amber-200 border border-amber-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-amber-300 hover:border-amber-500/30{% endif %}"
-          >
-            Elektra <span class="font-mono text-[11px] opacity-75">({{ resumen.total_elektra }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=ishop"
-            id="filter-ishop"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'ishop' %}bg-zinc-200/20 text-zinc-100 border border-zinc-300/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-zinc-200 hover:border-zinc-400/30{% endif %}"
-          >
-            iShop <span class="font-mono text-[11px] opacity-75">({{ resumen.total_ishop }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=walmart"
-            id="filter-walmart"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'walmart' %}bg-sky-500/20 text-sky-200 border border-sky-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-sky-300 hover:border-sky-500/30{% endif %}"
-          >
-            Walmart <span class="font-mono text-[11px] opacity-75">({{ resumen.total_walmart }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=paiz"
-            id="filter-paiz"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'paiz' %}bg-lime-500/20 text-lime-200 border border-lime-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-lime-300 hover:border-lime-500/30{% endif %}"
-          >
-            Paiz <span class="font-mono text-[11px] opacity-75">({{ resumen.total_paiz }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=maxi-despensa"
-            id="filter-maxi-despensa"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'maxi-despensa' %}bg-yellow-500/20 text-yellow-200 border border-yellow-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-yellow-300 hover:border-yellow-500/30{% endif %}"
-          >
-            Maxi Despensa <span class="font-mono text-[11px] opacity-75">({{ resumen.total_maxi_despensa }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=la-torre"
-            id="filter-la-torre"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'la-torre' %}bg-teal-500/20 text-teal-200 border border-teal-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-teal-300 hover:border-teal-500/30{% endif %}"
-          >
-            La Torre <span class="font-mono text-[11px] opacity-75">({{ resumen.total_la_torre }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=cemaco"
-            id="filter-cemaco"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'cemaco' %}bg-cyan-500/20 text-cyan-200 border border-cyan-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-cyan-300 hover:border-cyan-500/30{% endif %}"
-          >
-            Cemaco <span class="font-mono text-[11px] opacity-75">({{ resumen.total_cemaco }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=pacifiko"
-            id="filter-pacifiko"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'pacifiko' %}bg-blue-500/20 text-blue-200 border border-blue-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-blue-300 hover:border-blue-500/30{% endif %}"
-          >
-            Pacifiko <span class="font-mono text-[11px] opacity-75">({{ resumen.total_pacifiko }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=tiendas-max"
-            id="filter-tiendas-max"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'tiendas-max' %}bg-orange-500/20 text-orange-200 border border-orange-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-orange-300 hover:border-orange-500/30{% endif %}"
-          >
-            Tiendas Max <span class="font-mono text-[11px] opacity-75">({{ resumen.total_tiendas_max }})</span>
-          </a>
-
-          <a
-            href="/?q={{ query | urlencode }}&tienda=kemik"
-            id="filter-kemik"
-            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'kemik' %}bg-amber-500/20 text-amber-200 border border-amber-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-amber-300 hover:border-amber-500/30{% endif %}"
-          >
-            Kemik <span class="font-mono text-[11px] opacity-75">({{ resumen.total_kemik }})</span>
-          </a>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-          <span class="font-mono text-[11px]">Radar rápido:</span>
-          <a href="/?q=samsung" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">samsung</a>
-          <span>·</span>
-          <a href="/?q=lg" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">lg</a>
-          <span>·</span>
-          <a href="/?q=laptop" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">laptop</a>
-          <span>·</span>
-          <a href="/?q=galaxy+watch" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">galaxy watch</a>
-          <span>·</span>
-          <a href="/?q=pedigree" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">pedigree</a>
-          <span>·</span>
-          <a href="/" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">ver todo</a>
-        </div>
+      <!-- Barra de Selección Rápida de Categorías Principales (v3.0) -->
+      {% set categorias_v3 = [
+        ('', '✨ Todas', resumen.total, ''),
+        ('computo', '💻 Cómputo y Laptops', resumen.conteo_categorias.get('computo', 0), 'laptop'),
+        ('smartphones', '📱 Smartphones', resumen.conteo_categorias.get('smartphones', 0), 'samsung'),
+        ('hogar', '🏠 Línea Blanca y Hogar', resumen.conteo_categorias.get('hogar', 0), 'refrigeradora'),
+        ('herramientas', '🔨 Herramientas', resumen.conteo_categorias.get('herramientas', 0), 'taladro'),
+        ('super-mascotas', '🛒 Súper y Mascotas', resumen.conteo_categorias.get('super-mascotas', 0), 'pedigree'),
+      ] %}
+      <div class="mt-5 flex items-center justify-start sm:justify-center gap-2 overflow-x-auto no-scrollbar pb-1" id="barra-categorias-principales">
+        {% for slug_cat, label_cat, count_cat, termino_sugerido in categorias_v3 %}
+        <button
+          type="button"
+          data-cat-pill="{{ slug_cat }}"
+          data-cat-count="{{ count_cat }}"
+          data-cat-sugerido="{{ termino_sugerido }}"
+          onclick="seleccionarCategoriaPrincipal('{{ slug_cat }}', '{{ termino_sugerido }}')"
+          class="cat-pill shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-display font-semibold transition-all {% if categoria_activa == slug_cat %}bg-emerald-500/20 border-emerald-400/50 text-emerald-200 shadow-sm{% else %}bg-white/[0.03] hover:bg-white/[0.07] border-white/[0.08] text-zinc-300 hover:text-white{% endif %}"
+        >
+          <span>{{ label_cat }}</span>
+          <span class="px-1.5 py-0.5 rounded-md font-mono text-[10px] {% if categoria_activa == slug_cat %}bg-emerald-400/20 text-emerald-200{% else %}bg-white/[0.06] text-zinc-400{% endif %}">
+            {{ count_cat }}
+          </span>
+        </button>
+        {% endfor %}
       </div>
 
-      <!-- Notificación de Escaneo en Vivo -->
-      <div id="scan-toast" class="hidden mt-4 rounded-xl border border-white/[0.12] bg-[#131822] px-4 py-3 text-sm text-zinc-200"></div>
+      <!-- Píldoras Dinámicas de Tiendas (Con colapso inteligente de tiendas con 0 resultados) -->
+      {% set tiendas_config = [
+        ('intelaf', 'Intelaf', resumen.total_intelaf, 'sky'),
+        ('la-curacao', 'La Curacao', resumen.total_la_curacao, 'amber'),
+        ('tienda-claro', 'Tienda Claro', resumen.total_tienda_claro, 'rose'),
+        ('tecno-facil', 'Tecno Fácil', resumen.total_tecno_facil, 'orange'),
+        ('pricesmart', 'PriceSmart ★', resumen.total_pricesmart, 'amber'),
+        ('siman', 'Siman', resumen.total_siman, 'rose'),
+        ('elektra', 'Elektra', resumen.total_elektra, 'yellow'),
+        ('ishop', 'iShop', resumen.total_ishop, 'zinc'),
+        ('walmart', 'Walmart', resumen.total_walmart, 'sky'),
+        ('maxi-despensa', 'Maxi Despensa', resumen.total_maxi_despensa, 'lime'),
+        ('paiz', 'Paiz', resumen.total_paiz, 'teal'),
+        ('cemaco', 'Cemaco', resumen.total_cemaco, 'cyan'),
+        ('pacifiko', 'Pacifiko', resumen.total_pacifiko, 'indigo'),
+        ('la-torre', 'La Torre', resumen.total_la_torre, 'amber'),
+        ('tiendas-max', 'Tiendas Max', resumen.total_tiendas_max, 'orange'),
+        ('kemik', 'Kemik', resumen.total_kemik, 'purple'),
+      ] %}
+      <div class="mt-3.5 flex flex-wrap items-center justify-center gap-1.5 text-xs" id="barra-tiendas-dinamica">
+        <button
+          type="button"
+          data-store-pill=""
+          onclick="filtrarPorTiendaInstantaneo('')"
+          class="store-pill px-3 py-1.5 rounded-full border transition font-medium {% if not tienda_activa %}bg-white text-obsidian-950 border-white font-semibold{% else %}bg-white/[0.02] text-zinc-400 border-white/[0.07] hover:text-zinc-200 hover:border-white/20{% endif %}"
+        >
+          Todas las tiendas ({{ resumen.total }})
+        </button>
+
+        {% set ns = namespace(sin_stock=0) %}
+        {% for slug_t, nombre_t, count_t, color_t in tiendas_config %}
+          {% if count_t > 0 or tienda_activa == slug_t %}
+          <button
+            type="button"
+            data-store-pill="{{ slug_t }}"
+            data-store-has-stock="true"
+            onclick="filtrarPorTiendaInstantaneo('{{ slug_t }}')"
+            class="store-pill inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition font-medium {% if tienda_activa == slug_t %}bg-emerald-500/20 text-emerald-200 border-emerald-400/50{% else %}bg-white/[0.03] text-zinc-200 border-white/[0.09] hover:border-emerald-400/40 hover:text-white{% endif %}"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>{{ nombre_t }}</span>
+            <span class="font-mono text-[10px] px-1.5 py-0.2 rounded bg-white/[0.07] text-emerald-300">{{ count_t }}</span>
+          </button>
+          {% else %}
+          {% set ns.sin_stock = ns.sin_stock + 1 %}
+          <button
+            type="button"
+            data-store-pill="{{ slug_t }}"
+            data-store-has-stock="false"
+            onclick="filtrarPorTiendaInstantaneo('{{ slug_t }}')"
+            class="store-pill store-pill-empty hidden items-center gap-1.5 px-2.5 py-1 rounded-full border bg-white/[0.01] text-zinc-500 border-white/[0.05] hover:text-zinc-300 hover:border-white/15 transition text-[11px]"
+          >
+            <span>{{ nombre_t }}</span>
+            <span class="font-mono text-[10px] text-zinc-600">0</span>
+          </button>
+          {% endif %}
+        {% endfor %}
+
+        {% if ns.sin_stock > 0 %}
+        <button
+          type="button"
+          id="btn-toggle-tiendas-vacias"
+          onclick="alternarTiendasSinStock()"
+          class="px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-[11px] text-zinc-400 hover:text-zinc-200 hover:border-white/25 transition font-mono"
+        >
+          +{{ ns.sin_stock }} tiendas (0)
+        </button>
+        {% endif %}
+      </div>
+
+      <!-- Estado de escaneo en vivo -->
+      <div id="estado-escaneo" class="hidden mt-4 text-xs font-medium px-4 py-2.5 rounded-xl border"></div>
     </section>
 
-    <!-- ANUNCIO NATIVO DE LA CASA #1: Z-Tech Imports (Dinámico en Cómputo, Laptops y Workstations) -->
-    <aside
-      id="ztech-imports-banner"
-      aria-label="Z-Tech Imports — Importación Directa"
-      class="mb-7 rounded-xl native-ad-ztech p-4 sm:p-5 transition-all {% if not destacar_ztech %}hidden{% endif %}"
-    >
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-start gap-3.5">
-          <div class="w-10 h-10 rounded-lg bg-sky-500/15 border border-sky-400/30 text-sky-300 flex items-center justify-center font-mono font-bold text-xs shrink-0 mt-0.5">
-            Z·T
-          </div>
-          <div>
-            <div class="flex flex-wrap items-center gap-2 mb-1">
-              <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-400/25 font-semibold">
-                Holding Partner · Z-Tech Imports GT
-              </span>
-              <span class="text-xs text-zinc-400 font-mono">
-                Importación Directa Bajo Pedido
-              </span>
-            </div>
-            <h2 class="text-sm sm:text-base font-semibold text-zinc-100">
-              ¿Buscas Laptops, Workstations, GPUs o Hardware Especializado a mejor precio que el retail local?
-            </h2>
-            <p class="mt-0.5 text-xs sm:text-sm text-zinc-400">
-              En <strong class="text-zinc-200">Z-Tech Imports</strong> cotizamos e importamos tu configuración exacta directo de fábrica/ distribuidor mayorista en EE. UU. con garantía local y ahorro de hasta un <span class="text-sky-300 font-mono font-semibold">18%–25%</span> frente a tienda departamental.
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2.5 shrink-0">
-          <a
-            id="cta-ztech-imports"
-            href="https://wa.me/50200000000?text={{ ('Hola Z-Tech Imports, vi en tecHunter la búsqueda de ' ~ (query or 'Workstation / Laptop') ~ ' y deseo cotizar bajo pedido directo.') | urlencode }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-sky-400 px-4 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-sky-300 transition-colors"
-          >
-            <span id="cta-ztech-label">Cotizar "{{ query or 'Workstation / Laptop' }}" en Z-Tech</span>
-            <span aria-hidden="true">↗</span>
-          </a>
-        </div>
-      </div>
-    </aside>
-
     {% if error_db %}
-    <!-- Alerta de Error de Base de Datos -->
-    <div class="mb-6 rounded-xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200">
+    <div class="max-w-3xl mx-auto mb-8 p-4 rounded-2xl bg-red-950/40 border border-red-500/30 text-red-300 text-sm">
       <strong class="font-semibold">Error conectando a Neon DB:</strong> {{ error_db }}
     </div>
     {% endif %}
 
-    {% if resumen.mejor_oferta %}
-    <!-- Cinta Ejecutiva de Indicadores (KPIs) -->
-    <section class="mb-7 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-      <div class="surface-card rounded-xl p-4 sm:p-5">
-        <div class="flex items-center justify-between">
-          <p class="font-mono text-[11px] uppercase tracking-wider text-zinc-400">Mejor Precio Verificado</p>
-          <span class="inline-flex items-center rounded bg-emerald-500/15 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-300 border border-emerald-500/30">
-            {{ resumen.mejor_oferta.tienda }}
-          </span>
+    <!-- BANNER NATIVO 1: Z-TECH IMPORTS GT (ztechgt.com — Anuncio de la Casa para Cómputo, Laptops y Workstations) -->
+    <section
+      id="ztech-imports-banner"
+      class="{% if not destacar_ztech %}hidden {% endif %}mb-8 relative overflow-hidden rounded-3xl bg-gradient-to-r from-obsidian-900 via-sky-950/40 to-obsidian-900 border border-sky-400/30 p-5 sm:p-7 ztech-glow transition-all"
+    >
+      <div class="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-sky-500/10 blur-3xl pointer-events-none"></div>
+      <div class="relative flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+        <div class="space-y-2 max-w-2xl">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-400/15 border border-sky-400/40 text-sky-300 text-[10px] font-display font-bold uppercase tracking-wider">
+              ⚡ Z-Tech Imports GT · Importación Directa
+            </span>
+            <span class="text-[11px] text-zinc-400 font-mono">ztechgt.com · Laptops, Workstations &amp; Hardware</span>
+          </div>
+          <h2 class="font-display text-lg sm:text-xl font-bold text-white tracking-tight">
+            ¿Buscas una Laptop, Workstation o GPU a mejor precio que el retail local?
+          </h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            En <strong class="text-sky-300 font-semibold">Z-Tech Imports GT</strong> cotizamos e importamos equipos de cómputo, MacBooks, laptops gamer y componentes de alto rendimiento bajo pedido directo desde EE. UU., ahorrándote el sobreprecio de piso en Guatemala con garantía local.
+          </p>
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="font-mono text-2xl sm:text-3xl font-bold text-emerald-400 tabular-nums">
-            Q{{ "{:,.2f}".format(resumen.mejor_oferta.precio_gtq) }}
-          </span>
-          <span class="font-mono text-xs text-zinc-500 tabular-nums">
-            GTQ
-          </span>
-        </div>
-        <p class="mt-1.5 text-xs text-zinc-400 truncate" title="{{ resumen.mejor_oferta.titulo }}">
-          {{ resumen.mejor_oferta.titulo }}
-        </p>
-      </div>
 
-      <div class="surface-card rounded-xl p-4 sm:p-5">
-        <p class="font-mono text-[11px] uppercase tracking-wider text-zinc-400">Brecha / Ahorro Máximo</p>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="font-mono text-2xl sm:text-3xl font-semibold text-zinc-100 tabular-nums">
-            Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}
+        <div class="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-2.5 shrink-0">
+          <a
+            id="cta-ztech-imports"
+            href="https://ztechgt.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-sky-400 hover:bg-sky-300 text-obsidian-950 font-display font-bold text-xs sm:text-sm transition shadow-lg shadow-sky-500/20"
+          >
+            <span>Cotizar en ZTechGT.com</span>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
+          <span class="text-[11px] text-zinc-400 text-center lg:text-right">
+            Cotización directa en <strong class="text-sky-300">ztechgt.com</strong> · Entrega en toda Guatemala
           </span>
         </div>
-        <p class="mt-1.5 text-xs text-zinc-500">
-          Diferencia entre la opción más cara y la más baja
-        </p>
-      </div>
-
-      <div class="surface-card rounded-xl p-4 sm:p-5">
-        <p class="font-mono text-[11px] uppercase tracking-wider text-zinc-400">Ofertas Principales (Sin Ruido)</p>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="font-mono text-2xl sm:text-3xl font-semibold text-zinc-100 tabular-nums">
-            {{ resumen.total }}
-          </span>
-          <span class="text-xs text-zinc-400">
-            resultados limpios
-          </span>
-        </div>
-        <p class="mt-1.5 text-xs text-zinc-500 truncate">
-          Siman ({{ resumen.total_siman }}) · Elektra ({{ resumen.total_elektra }}) · iShop ({{ resumen.total_ishop }}) · Walmart/Paiz/Maxi ({{ resumen.total_walmart + resumen.total_paiz + resumen.total_maxi_despensa }}) · Cemaco ({{ resumen.total_cemaco }}) · Pacifiko ({{ resumen.total_pacifiko }})
-        </p>
       </div>
     </section>
-    {% endif %}
 
-    <!-- Listado Comparativo de Productos -->
     {% if ofertas %}
-    {% set precio_minimo = ofertas[0].precio_gtq %}
-    <section aria-label="Resultados de comparación" class="space-y-3">
-      {% for oferta in ofertas %}
-      {% set es_mejor = (loop.index == 1) %}
-      {% set diferencia_gtq = oferta.precio_gtq - precio_minimo %}
+    <!-- Banner Destacado de Mejor Precio + KPIs -->
+    <section class="mb-9 grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <!-- Tarjeta Principal: Mejor Precio Detectado -->
+      <div class="lg:col-span-8 relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950/45 via-obsidian-850 to-obsidian-900 border border-emerald-500/30 p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div class="space-y-2 max-w-xl">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-[11px] font-semibold uppercase tracking-wider">
+            <span>★ Mejor Precio Verificado</span>
+            <span>·</span>
+            <span>{{ resumen.mejor_oferta.tienda }}</span>
+          </div>
+          <h2 class="font-display text-lg sm:text-xl font-bold text-white line-clamp-2">
+            {{ resumen.mejor_oferta.titulo }}
+          </h2>
+          <p class="text-xs text-zinc-400">
+            Envío estimado: <span class="font-mono text-zinc-300">Q{{ "{:,.2f}".format(resumen.mejor_oferta.costo_envio_gtq) }}</span> · Costo real puesto en casa: <span class="font-mono text-emerald-300 font-semibold">Q{{ "{:,.2f}".format(resumen.mejor_oferta.costo_real_gtq) }}</span>
+          </p>
+        </div>
+
+        <div class="flex sm:flex-col items-baseline sm:items-end justify-between gap-3 shrink-0 border-t sm:border-t-0 border-white/[0.07] pt-4 sm:pt-0">
+          <div class="text-left sm:text-right">
+            <span class="text-[11px] uppercase tracking-wider text-zinc-400 block">Precio Contado</span>
+            <span class="font-mono text-3xl sm:text-4xl font-bold text-emerald-400 tracking-tight">
+              Q{{ "{:,.2f}".format(resumen.mejor_oferta.precio_gtq) }}
+            </span>
+          </div>
+          <a
+            href="{{ resumen.mejor_oferta.url }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-obsidian-950 font-display font-bold text-xs transition inline-flex items-center gap-1.5"
+          >
+            <span>Ir a {{ resumen.mejor_oferta.tienda }}</span>
+            <span>↗</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Tarjeta Lateral: Ahorro Potencial y Desglose -->
+      <div class="lg:col-span-4 rounded-3xl bg-obsidian-850/90 border border-white/[0.07] p-6 flex flex-col justify-between">
+        <div>
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Ahorro Máximo Detectado</span>
+          <div class="mt-1 font-mono text-2xl sm:text-3xl font-bold text-white">
+            Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}
+          </div>
+          <p class="mt-1 text-xs text-zinc-500">
+            Diferencia entre la opción más económica y la más alta para tu búsqueda.
+          </p>
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-zinc-400">
+          <span>Ofertas visibles</span>
+          <span class="font-mono font-semibold text-zinc-200" id="contador-ofertas-visibles">{{ ofertas | length }} de {{ resumen.total }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grid de Tarjetas Comparativas Ordenadas por Precio -->
+    <section id="grid-ofertas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% for item in ofertas %}
       <article
-        class="group relative rounded-xl p-4 sm:p-5 {% if es_mejor %}surface-card-best{% else %}surface-card{% endif %}"
+        data-oferta-card="true"
+        data-categoria-ui="{{ item.categoria_ui }}"
+        data-tienda-slug="{{ item.tienda_slug }}"
+        class="oferta-card group rounded-3xl bg-obsidian-850/90 border transition-all duration-200 flex flex-col overflow-hidden {% if loop.first %}border-emerald-500/50 best-price-glow{% else %}border-white/[0.07] hover:border-white/[0.16] hover:-translate-y-0.5{% endif %}"
       >
-        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
-
-          <!-- Rango y Contenedor de Miniatura -->
-          <div class="flex items-center gap-3.5 w-full sm:w-auto">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-xs font-semibold shrink-0 {% if es_mejor %}bg-emerald-400 text-zinc-950 font-bold{% else %}bg-white/[0.04] text-zinc-400 border border-white/[0.07]{% endif %}">
-              #{{ loop.index }}
-            </div>
-
-            <div class="w-16 h-16 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
-              {% if oferta.imagen_url %}
-              <img
-                src="{{ oferta.imagen_url }}"
-                alt="{{ oferta.titulo }}"
-                loading="lazy"
-                class="max-h-full max-w-full object-contain"
-              />
+        <!-- Encabezado de Tarjeta (Tienda + Insignias) -->
+        <div class="px-5 pt-4 pb-3 flex items-center justify-between gap-2 border-b border-white/[0.05]">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide
+              {% if item.tienda_slug == 'intelaf' %}
+                bg-sky-500/15 text-sky-300 border border-sky-500/30
+              {% elif item.tienda_slug == 'la-curacao' %}
+                bg-amber-500/15 text-amber-300 border border-amber-500/30
+              {% elif item.tienda_slug == 'tienda-claro' %}
+                bg-rose-500/15 text-rose-300 border border-rose-500/30
+              {% elif item.tienda_slug in ['tecno-facil', 'tecnofacil'] %}
+                bg-orange-500/15 text-orange-300 border border-orange-500/30
+              {% elif item.tienda_slug == 'pricesmart' %}
+                bg-amber-500/20 text-amber-200 border border-amber-400/40
+              {% elif item.tienda_slug == 'siman' %}
+                bg-rose-500/15 text-rose-300 border border-rose-500/30
+              {% elif item.tienda_slug == 'elektra' %}
+                bg-yellow-500/15 text-yellow-300 border border-yellow-500/30
+              {% elif item.tienda_slug == 'ishop' %}
+                bg-zinc-500/20 text-zinc-200 border border-zinc-400/30
+              {% elif item.tienda_slug == 'walmart' %}
+                bg-sky-500/15 text-sky-300 border border-sky-500/30
+              {% elif item.tienda_slug == 'paiz' %}
+                bg-teal-500/15 text-teal-300 border border-teal-500/30
+              {% elif item.tienda_slug == 'maxi-despensa' %}
+                bg-lime-500/15 text-lime-300 border border-lime-500/30
+              {% elif item.tienda_slug == 'cemaco' %}
+                bg-cyan-500/15 text-cyan-300 border border-cyan-500/30
+              {% elif item.tienda_slug == 'pacifiko' %}
+                bg-indigo-500/15 text-indigo-300 border border-indigo-500/30
+              {% elif item.tienda_slug == 'la-torre' %}
+                bg-amber-500/15 text-amber-300 border border-amber-500/30
+              {% elif item.tienda_slug == 'tiendas-max' %}
+                bg-orange-500/15 text-orange-300 border border-orange-500/30
               {% else %}
-              <span class="text-[10px] font-mono text-zinc-400">SIN IMG</span>
+                bg-purple-500/15 text-purple-300 border border-purple-500/30
               {% endif %}
-            </div>
+            ">
+              <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+              {{ item.tienda }}
+            </span>
 
-            <!-- Precio visible en móvil -->
-            <div class="sm:hidden ml-auto text-right">
-              <div class="font-mono text-lg font-bold {% if es_mejor %}text-emerald-400{% else %}text-zinc-100{% endif %} tabular-nums">
-                Q{{ "{:,.2f}".format(oferta.precio_gtq) }}
-              </div>
-              <div class="text-[11px] text-zinc-400 font-mono tabular-nums">
-                Total c/envío: Q{{ "{:,.2f}".format(oferta.costo_real_gtq) }}
-              </div>
-            </div>
+            {% if item.requiere_membresia or item.tienda_slug == 'pricesmart' %}
+            <span class="px-2 py-0.5 rounded-md bg-amber-400/15 border border-amber-400/35 text-[10px] font-display font-bold uppercase tracking-wider text-amber-300">
+              ★ Socio Club
+            </span>
+            {% endif %}
+
+            {% if item.marca %}
+            <span class="px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.07] text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+              {{ item.marca }}
+            </span>
+            {% endif %}
           </div>
 
-          <!-- Jerarquía Central: Insignias, Marca, Título y Metadatos -->
-          <div class="flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2 mb-1.5">
-              <!-- Insignia de Tienda -->
-              {% if oferta.tienda_slug == 'siman' %}
-              <span class="inline-flex items-center rounded-md bg-rose-500/15 px-2.5 py-0.5 text-xs font-medium text-rose-300 border border-rose-400/25">
-                Siman Oficial
-              </span>
-              {% elif oferta.tienda_slug == 'elektra' %}
-              <span class="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300 border border-amber-400/25">
-                Elektra Oficial
-              </span>
-              {% elif oferta.tienda_slug == 'ishop' %}
-              <span class="inline-flex items-center rounded-md bg-zinc-200/15 px-2.5 py-0.5 text-xs font-medium text-zinc-200 border border-zinc-300/25">
-                iShop Oficial
-              </span>
-              {% elif oferta.tienda_slug == 'pricesmart' %}
-              <span class="inline-flex items-center rounded-md bg-blue-500/15 px-2.5 py-0.5 text-xs font-medium text-blue-200 border border-blue-400/25">
-                PriceSmart · Socios Club
-              </span>
-              {% elif oferta.tienda_slug == 'walmart' %}
-              <span class="inline-flex items-center rounded-md bg-sky-500/15 px-2.5 py-0.5 text-xs font-medium text-sky-300 border border-sky-400/25">
-                Walmart GT
-              </span>
-              {% elif oferta.tienda_slug == 'paiz' %}
-              <span class="inline-flex items-center rounded-md bg-lime-500/15 px-2.5 py-0.5 text-xs font-medium text-lime-300 border border-lime-400/25">
-                Paiz
-              </span>
-              {% elif oferta.tienda_slug == 'maxi-despensa' %}
-              <span class="inline-flex items-center rounded-md bg-yellow-500/15 px-2.5 py-0.5 text-xs font-medium text-yellow-300 border border-yellow-400/25">
-                Maxi Despensa
-              </span>
-              {% elif oferta.tienda_slug == 'kemik' %}
-              <span class="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300 border border-amber-400/25">
-                Kemik
-              </span>
-              {% elif oferta.tienda_slug == 'pacifiko' %}
-              <span class="inline-flex items-center rounded-md bg-blue-500/15 px-2.5 py-0.5 text-xs font-medium text-blue-300 border border-blue-400/25">
-                Pacifiko
-              </span>
-              {% elif oferta.tienda_slug == 'la-torre' %}
-              <span class="inline-flex items-center rounded-md bg-teal-500/15 px-2.5 py-0.5 text-xs font-medium text-teal-300 border border-teal-400/25">
-                La Torre
-              </span>
-              {% elif oferta.tienda_slug in ['tiendas-max', 'tecnofacil'] %}
-              <span class="inline-flex items-center rounded-md bg-orange-500/15 px-2.5 py-0.5 text-xs font-medium text-orange-300 border border-orange-400/25">
-                {{ oferta.tienda }}
-              </span>
-              {% elif oferta.tienda_slug == 'cemaco' %}
-              <span class="inline-flex items-center rounded-md bg-cyan-500/15 px-2.5 py-0.5 text-xs font-medium text-cyan-300 border border-cyan-400/25">
-                Cemaco
-              </span>
-              {% else %}
-              <span class="inline-flex items-center rounded-md bg-white/[0.06] px-2.5 py-0.5 text-xs font-medium text-zinc-300 border border-white/[0.1]">
-                {{ oferta.tienda }}
-              </span>
-              {% endif %}
+          {% if loop.first %}
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-400 text-obsidian-950 text-[10px] font-display font-extrabold uppercase tracking-wider shadow-sm">
+            ★ Mejor Precio
+          </span>
+          {% else %}
+          <span class="font-mono text-xs text-zinc-500">#{{ loop.index }}</span>
+          {% endif %}
+        </div>
 
-              <!-- Insignia Brillante Mejor Precio -->
-              {% if es_mejor %}
-              <span class="inline-flex items-center gap-1 rounded-md bg-emerald-400/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300 border border-emerald-400/40">
-                ★ MEJOR PRECIO
-              </span>
-              {% endif %}
+        <!-- Imagen del Producto -->
+        <div class="relative h-48 bg-gradient-to-b from-white/[0.03] to-transparent flex items-center justify-center p-5">
+          {% if item.imagen_url %}
+          <img
+            src="{{ item.imagen_url }}"
+            alt="{{ item.titulo }}"
+            loading="lazy"
+            class="max-h-full max-w-full object-contain rounded-xl group-hover:scale-105 transition-transform duration-300"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+          />
+          <div class="hidden items-center justify-center text-zinc-600 text-xs">
+            Sin vista previa
+          </div>
+          {% else %}
+          <div class="flex items-center justify-center text-zinc-600 text-xs">
+            Sin vista previa
+          </div>
+          {% endif %}
+        </div>
 
-              <!-- Etiqueta de Marca -->
-              {% if oferta.marca %}
-              <span class="inline-flex items-center rounded-md bg-white/[0.04] px-2 py-0.5 font-mono text-[11px] font-medium text-zinc-300 border border-white/[0.08]">
-                {{ oferta.marca }}
-              </span>
-              {% endif %}
-            </div>
-
-            <h2 class="text-sm sm:text-base font-medium text-zinc-100 group-hover:text-white transition-colors leading-snug">
-              <a href="{{ oferta.url }}" target="_blank" rel="noopener noreferrer" class="focus:outline-none">
-                {{ oferta.titulo }}
-              </a>
-            </h2>
-
-            <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500 font-mono">
-              <span>Sincronizado: {{ oferta.scraped_at[:19] }} UTC</span>
-              {% if not es_mejor and diferencia_gtq > 0 %}
-              <span class="text-zinc-400">+Q{{ "{:,.2f}".format(diferencia_gtq) }} vs. mejor oferta</span>
-              {% endif %}
-            </div>
+        <!-- Cuerpo de la Tarjeta -->
+        <div class="p-5 flex-1 flex flex-col justify-between">
+          <div>
+            <h3 class="font-display font-semibold text-zinc-100 text-sm leading-snug line-clamp-2 group-hover:text-emerald-300 transition">
+              {{ item.titulo }}
+            </h3>
           </div>
 
-          <!-- Columna Derecha: Precio en GTQ + Enlace Directo Limpio -->
-          <div class="hidden sm:flex flex-col items-end justify-center shrink-0 text-right pl-5 border-l border-white/[0.06]">
-            <div class="font-mono text-xl font-bold {% if es_mejor %}text-emerald-400{% else %}text-zinc-100{% endif %} tabular-nums">
-              Q{{ "{:,.2f}".format(oferta.precio_gtq) }}
-            </div>
-            <div class="text-[11px] text-zinc-400 font-mono tabular-nums mt-0.5">
-              + Q{{ "{:,.2f}".format(oferta.costo_envio_gtq) }} envío = <strong class="text-zinc-200">Q{{ "{:,.2f}".format(oferta.costo_real_gtq) }}</strong>
+          <div class="mt-5 pt-4 border-t border-white/[0.06] flex items-end justify-between gap-2">
+            <div>
+              <span class="text-[10px] uppercase tracking-wider text-zinc-500 block">
+                {% if item.requiere_membresia or item.tienda_slug == 'pricesmart' %}
+                Precio Socio (GTQ)
+                {% else %}
+                Precio Tienda (GTQ)
+                {% endif %}
+              </span>
+              <span class="font-mono text-2xl font-bold tracking-tight {% if loop.first %}text-emerald-400{% else %}text-white{% endif %}">
+                Q{{ "{:,.2f}".format(item.precio_gtq) }}
+              </span>
+              <span class="block text-[11px] text-zinc-500 mt-0.5">
+                Total c/envío: <strong class="font-mono text-zinc-300">Q{{ "{:,.2f}".format(item.costo_real_gtq) }}</strong>
+              </span>
             </div>
 
             <a
-              href="{{ oferta.url }}"
+              href="{{ item.url }}"
               target="_blank"
               rel="noopener noreferrer"
-              class="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors {% if es_mejor %}bg-emerald-400 text-zinc-950 hover:bg-emerald-300{% else %}bg-white/[0.06] text-zinc-200 border border-white/[0.1] hover:bg-white hover:text-zinc-950{% endif %}"
+              class="px-4 py-2.5 rounded-xl text-xs font-display font-semibold transition inline-flex items-center gap-1.5 {% if loop.first %}bg-emerald-400 hover:bg-emerald-300 text-obsidian-950 shadow-sm{% else %}bg-white/[0.06] hover:bg-white/[0.12] text-zinc-100 border border-white/[0.08]{% endif %}"
             >
-              Ir a {{ oferta.tienda }}
-              <span aria-hidden="true">↗</span>
+              <span>Ver oferta</span>
+              <span>↗</span>
             </a>
           </div>
-
         </div>
       </article>
       {% endfor %}
     </section>
 
-    {% else %}
-    <!-- Estado Vacío -->
-    <section class="surface-card rounded-2xl p-12 text-center">
-      <div class="mx-auto w-12 h-12 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-zinc-400 mb-3.5">
-        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-        </svg>
-      </div>
-      <h2 class="text-base font-semibold text-zinc-100">
-        Sin registros principales en Neon DB para "{{ query }}"
-      </h2>
-      <p class="mt-1.5 text-sm text-zinc-400 max-w-md mx-auto">
-        Ejecuta un escaneo en vivo en los distribuidores oficiales y supermercados haciendo clic en <strong class="text-zinc-200">"Escanear Tiendas"</strong> o consulta todo el catálogo sincronizado.
+    <!-- Aviso dinámico cuando un filtro instantáneo de categoría/tienda no tiene coincidencias en la vista actual -->
+    <div id="aviso-filtro-vacio" class="hidden max-w-xl mx-auto text-center py-12 px-6 rounded-3xl bg-obsidian-850/80 border border-white/[0.07] my-6">
+      <p class="text-sm text-zinc-300 font-medium" id="texto-filtro-vacio">
+        No hay productos de esta categoría en la búsqueda actual.
       </p>
-      <div class="mt-6 flex justify-center gap-3">
-        <a
-          href="/"
-          class="inline-flex items-center rounded-xl bg-zinc-100 px-4 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-white transition-colors"
-        >
-          Ver catálogo completo
-        </a>
+      <div class="mt-4 flex flex-wrap justify-center gap-2.5">
         <button
           type="button"
-          onclick="escanearEnVivo()"
-          class="inline-flex items-center rounded-xl border border-white/[0.12] bg-[#141922] px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-[#1B212D] transition-colors"
+          onclick="seleccionarCategoriaPrincipal('', '')"
+          class="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs text-zinc-200 border border-white/[0.1]"
         >
-          Escanear "{{ query or 'samsung' }}" en vivo
+          Ver todos los resultados actuales
         </button>
+        <a
+          id="link-explorar-categoria"
+          href="/"
+          class="px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-obsidian-950 font-display font-bold text-xs"
+        >
+          Explorar categoría en toda la base de datos →
+        </a>
       </div>
+    </div>
+
+    {% else %}
+    <!-- Estado Vacío -->
+    <section class="max-w-lg mx-auto text-center py-16 px-6 rounded-3xl bg-obsidian-850/80 border border-white/[0.07]">
+      <div class="w-12 h-12 rounded-2xl bg-white/[0.04] border border-white/[0.08] mx-auto flex items-center justify-center text-zinc-400 mb-4 font-mono">
+        ∅
+      </div>
+      <h2 class="font-display text-lg font-semibold text-white">No encontramos ofertas principales para tu búsqueda</h2>
+      <p class="mt-1.5 text-sm text-zinc-400">
+        Haz clic en <strong class="text-emerald-300">Escanear Tiendas</strong> para consultar Intelaf, La Curacao, Tienda Claro, Tecno Fácil, PriceSmart, Siman, Elektra, iShop, Grupo Walmart, Cemaco, Pacifiko y La Torre en tiempo real.
+      </p>
     </section>
     {% endif %}
 
-    <!-- ANUNCIO NATIVO DE LA CASA #2: Nova Viventia Travel (Tarjeta Secundaria / Pre-Footer) -->
+    <!-- BANNER NATIVO 2: NOVA VIVENTIA TRAVEL (novaviventiatravel.com — Anuncio de la Casa Pre-Footer) -->
     <section
       id="nova-viventia-banner"
-      aria-label="Nova Viventia Travel — Experiencias y Viajes"
-      class="mt-10 rounded-xl native-ad-nova p-5 sm:p-6"
+      class="mt-12 relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950/40 via-obsidian-900 to-teal-950/35 border border-emerald-500/25 p-6 sm:p-8 nova-glow"
     >
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-start gap-3.5">
-          <div class="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-300 flex items-center justify-center font-mono font-bold text-xs shrink-0 mt-0.5">
-            NV
+      <div class="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
+      <div class="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div class="space-y-2 max-w-2xl">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-400/15 border border-emerald-400/35 text-emerald-300 text-[10px] font-display font-bold uppercase tracking-wider">
+              ✈️ Nova Viventia Travel · Experiencias &amp; Destinos
+            </span>
+            <span class="text-[11px] text-zinc-400 font-mono">novaviventiatravel.com · Viaja con tu Ahorro Inteligente</span>
           </div>
-          <div>
-            <div class="flex flex-wrap items-center gap-2 mb-1">
-              <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-400/25 font-semibold">
-                Holding Lifestyle · Nova Viventia Travel
-              </span>
-              {% if resumen.ahorro_maximo_gtq and resumen.ahorro_maximo_gtq > 0 %}
-              <span class="text-xs text-emerald-300 font-mono">
-                Invierte tus Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }} de ahorro en tu próxima experiencia
-              </span>
-              {% endif %}
-            </div>
-            <h2 class="text-sm sm:text-base font-semibold text-zinc-100">
-              Convierte el ahorro inteligente de tus compras en tecnología y hogar en tu próximo viaje
-            </h2>
-            <p class="mt-0.5 text-xs sm:text-sm text-zinc-400">
-              Con <strong class="text-zinc-200">Nova Viventia Travel</strong> diseñamos escapadas a medida, rutas de aventura en Guatemala y viajes internacionales optimizando cada quetzal que ahorraste en <strong class="text-zinc-200">tecHunter</strong>.
-            </p>
-          </div>
+          <h2 class="font-display text-xl sm:text-2xl font-bold text-white tracking-tight">
+            Convierte el dinero ahorrado hoy en tu próxima gran aventura
+          </h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            {% if resumen and resumen.ahorro_maximo_gtq > 0 %}
+            Comparando en <strong class="text-white">tecHunter</strong> acabas de detectar hasta <strong class="font-mono text-emerald-300">Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</strong> de ahorro potencial.
+            {% endif %}
+            Con <strong class="text-emerald-300 font-semibold">Nova Viventia Travel</strong> diseña escapadas a medida, vuelos, cruceros y experiencias inolvidables alrededor del mundo con asesoría personalizada desde Guatemala.
+          </p>
         </div>
 
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-2.5 shrink-0">
           <a
             id="cta-nova-viventia"
-            href="https://wa.me/50200000000?text={{ ('Hola Nova Viventia Travel, vengo desde tecHunter GT y quiero planear mi próximo viaje.') | urlencode }}"
+            href="https://novaviventiatravel.com"
             target="_blank"
             rel="noopener noreferrer"
-            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/15 px-4 py-2.5 text-xs font-semibold text-amber-200 hover:bg-amber-400 hover:text-zinc-950 transition-colors"
+            class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-obsidian-950 font-display font-bold text-xs sm:text-sm transition shadow-lg shadow-emerald-500/20"
           >
-            Planear Viaje con Nova Viventia
-            <span aria-hidden="true">↗</span>
+            <span>Explorar Destinos en NovaViventiaTravel.com</span>
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
           </a>
+          <span class="text-[11px] text-zinc-400 text-center lg:text-right">
+            Atención VIP para viajeros en <strong class="text-emerald-300">novaviventiatravel.com</strong>
+          </span>
         </div>
       </div>
     </section>
-
   </main>
 
-  <footer class="border-t border-white/[0.07] bg-[#090B0E] py-6 mt-12">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-2">
-      <span><strong class="text-zinc-300">tecHunter GT</strong> · Ecosistema Corporativo (<span class="text-sky-300/90">Z-Tech Imports</span> &amp; <span class="text-amber-300/90">Nova Viventia Travel</span>)</span>
-      <span class="font-mono text-[11px]">Siman · Elektra · iShop · Walmart · Paiz · Maxi · Kemik · Pacifiko · La Torre · Max · Cemaco · PriceSmart</span>
+  <!-- Pie de Página Corporativo -->
+  <footer class="border-t border-white/[0.06] py-6 text-center text-xs text-zinc-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <span>tecHunter v3.0 · Clean Architecture + FastAPI + Neon PostgreSQL</span>
+      <div class="flex flex-wrap items-center justify-center gap-3 text-zinc-400">
+        <a href="https://ztechgt.com" target="_blank" rel="noopener noreferrer" class="hover:text-sky-300 transition">Z-Tech Imports (ztechgt.com)</a>
+        <span class="text-zinc-700">·</span>
+        <a href="https://novaviventiatravel.com" target="_blank" rel="noopener noreferrer" class="hover:text-emerald-300 transition">Nova Viventia Travel (novaviventiatravel.com)</a>
+      </div>
     </div>
   </footer>
 
+  <!-- Lógica de Filtrado Instantáneo, Activación Contextual y Escaneo Seguro -->
   <script>
-    const KEYWORDS_ZTECH = [
+    const PALABRAS_CLAVE_ZTECH = [
       'laptop', 'notebook', 'workstation', 'computadora', 'pc', 'macbook',
       'imac', 'mac mini', 'monitor', 'pantalla', 'rtx', 'gtx', 'radeon',
-      'gpu', 'procesador', 'ryzen', 'intel', 'ram', 'ssd', 'nvme',
-      'teclado', 'mouse', 'gamer', 'gaming', 'volante', 'g29', 'logitech',
-      'asus', 'lenovo', 'thinkpad', 'hp', 'dell', 'alienware', 'msi',
-      'acer', 'razer', 'servidor', 'nas', 'computo'
+      'gpu', 'tarjeta grafica', 'procesador', 'ryzen', 'intel', 'core i',
+      'ram', 'ssd', 'nvme', 'teclado', 'mouse', 'gamer', 'gaming',
+      'volante', 'g29', 'logitech', 'asus', 'lenovo', 'thinkpad', 'hp',
+      'dell', 'alienware', 'msi', 'acer', 'razer', 'servidor', 'nas'
     ];
 
-    function evaluarBannerZTechDinamico(valor) {
+    let estadoFiltroCategoria = "{{ categoria_activa }}";
+    let estadoFiltroTienda = "{{ tienda_activa }}";
+    let mostrandoTiendasVacias = false;
+
+    function evaluarBannerZTechDinamico(valorBusqueda, categoriaActiva) {
       const banner = document.getElementById('ztech-imports-banner');
-      const label = document.getElementById('cta-ztech-label');
-      const cta = document.getElementById('cta-ztech-imports');
       if (!banner) return;
 
-      const limpio = (valor || '').trim();
-      const lower = limpio.toLowerCase();
-      const coincide = !lower || KEYWORDS_ZTECH.some((kw) => lower.includes(kw));
+      if (categoriaActiva === 'computo') {
+        banner.classList.remove('hidden');
+        return;
+      }
+
+      const limpio = (valorBusqueda || '').trim().toLowerCase();
+      const coincide = !limpio || PALABRAS_CLAVE_ZTECH.some((kw) => limpio.includes(kw));
 
       if (coincide) {
         banner.classList.remove('hidden');
-        const terminoCotizar = limpio || 'Workstation / Laptop';
-        if (label) {
-          label.textContent = `Cotizar "${terminoCotizar}" en Z-Tech`;
-        }
-        if (cta) {
-          const msg = `Hola Z-Tech Imports, vi en tecHunter la búsqueda de ${terminoCotizar} y deseo cotizar bajo pedido directo.`;
-          cta.href = `https://wa.me/50200000000?text=${encodeURIComponent(msg)}`;
-        }
       } else {
         banner.classList.add('hidden');
       }
     }
 
-    document.addEventListener('keydown', (e) => {
-      if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
-        e.preventDefault();
-        document.getElementById('search-input')?.focus();
+    function aplicarFiltrosEnDOM() {
+      const cards = document.querySelectorAll('[data-oferta-card="true"]');
+      let visibles = 0;
+
+      cards.forEach((card) => {
+        const catCard = card.getAttribute('data-categoria-ui') || '';
+        const tiendaCard = card.getAttribute('data-tienda-slug') || '';
+
+        const cumpleCat = !estadoFiltroCategoria || catCard === estadoFiltroCategoria;
+        const cumpleTienda = !estadoFiltroTienda || tiendaCard === estadoFiltroTienda;
+
+        if (cumpleCat && cumpleTienda) {
+          card.classList.remove('hidden');
+          visibles += 1;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      const contador = document.getElementById('contador-ofertas-visibles');
+      if (contador) {
+        contador.textContent = `${visibles} de ${cards.length}`;
+      }
+
+      const avisoVacio = document.getElementById('aviso-filtro-vacio');
+      const grid = document.getElementById('grid-ofertas');
+      if (avisoVacio && grid) {
+        if (visibles === 0 && cards.length > 0) {
+          avisoVacio.classList.remove('hidden');
+          const linkExplorar = document.getElementById('link-explorar-categoria');
+          if (linkExplorar) {
+            const params = new URLSearchParams();
+            if (estadoFiltroCategoria) params.set('cat', estadoFiltroCategoria);
+            if (estadoFiltroTienda) params.set('tienda', estadoFiltroTienda);
+            linkExplorar.href = `/?${params.toString()}`;
+          }
+        } else {
+          avisoVacio.classList.add('hidden');
+        }
+      }
+    }
+
+    function seleccionarCategoriaPrincipal(slugCat, terminoSugerido) {
+      estadoFiltroCategoria = slugCat || '';
+      const hiddenCat = document.getElementById('hidden-cat-input');
+      if (hiddenCat) hiddenCat.value = estadoFiltroCategoria;
+
+      // Actualizar estilos activos de las píldoras de categoría
+      document.querySelectorAll('.cat-pill').forEach((btn) => {
+        const btnCat = btn.getAttribute('data-cat-pill') || '';
+        if (btnCat === estadoFiltroCategoria) {
+          btn.className = 'cat-pill shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-display font-semibold transition-all bg-emerald-500/20 border-emerald-400/50 text-emerald-200 shadow-sm';
+        } else {
+          btn.className = 'cat-pill shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-display font-semibold transition-all bg-white/[0.03] hover:bg-white/[0.07] border-white/[0.08] text-zinc-300 hover:text-white';
+        }
+      });
+
+      const inputBusqueda = document.getElementById('input-query');
+      evaluarBannerZTechDinamico(inputBusqueda ? inputBusqueda.value : '', estadoFiltroCategoria);
+
+      const cards = document.querySelectorAll('[data-oferta-card="true"]');
+      const coincidenciasEnDOM = Array.from(cards).filter(
+        (c) => !estadoFiltroCategoria || c.getAttribute('data-categoria-ui') === estadoFiltroCategoria
+      ).length;
+
+      // Si hay tarjetas coincidentes en el DOM actual, filtrar instantáneamente (0ms)
+      if (coincidenciasEnDOM > 0 || !estadoFiltroCategoria) {
+        aplicarFiltrosEnDOM();
+        const url = new URL(window.location.href);
+        if (estadoFiltroCategoria) {
+          url.searchParams.set('cat', estadoFiltroCategoria);
+        } else {
+          url.searchParams.delete('cat');
+        }
+        window.history.replaceState({}, '', url.toString());
+      } else {
+        // Si la vista actual no tiene ítems de esa categoría, cargar la categoría desde Neon DB
+        window.location.href = `/?cat=${encodeURIComponent(estadoFiltroCategoria)}`;
+      }
+    }
+
+    function filtrarPorTiendaInstantaneo(slugTienda) {
+      estadoFiltroTienda = slugTienda || '';
+
+      document.querySelectorAll('.store-pill').forEach((btn) => {
+        const btnStore = btn.getAttribute('data-store-pill') || '';
+        const hasStock = btn.getAttribute('data-store-has-stock') === 'true';
+        if (btnStore === estadoFiltroTienda) {
+          btn.classList.add('border-emerald-400/60', 'bg-emerald-500/20', 'text-emerald-200');
+        } else {
+          btn.classList.remove('border-emerald-400/60', 'bg-emerald-500/20', 'text-emerald-200');
+          if (!hasStock && btnStore !== '' && !mostrandoTiendasVacias) {
+            btn.classList.add('hidden');
+          }
+        }
+      });
+
+      aplicarFiltrosEnDOM();
+      const url = new URL(window.location.href);
+      if (estadoFiltroTienda) {
+        url.searchParams.set('tienda', estadoFiltroTienda);
+      } else {
+        url.searchParams.delete('tienda');
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+
+    function alternarTiendasSinStock() {
+      mostrandoTiendasVacias = !mostrandoTiendasVacias;
+      const vacias = document.querySelectorAll('.store-pill-empty');
+      const btnToggle = document.getElementById('btn-toggle-tiendas-vacias');
+
+      vacias.forEach((el) => {
+        if (mostrandoTiendasVacias) {
+          el.classList.remove('hidden');
+          el.classList.add('inline-flex');
+        } else {
+          el.classList.add('hidden');
+          el.classList.remove('inline-flex');
+        }
+      });
+
+      if (btnToggle) {
+        btnToggle.textContent = mostrandoTiendasVacias
+          ? 'Ocultar tiendas (0)'
+          : `+${vacias.length} tiendas (0)`;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputBusqueda = document.getElementById('input-query');
+      if (inputBusqueda) {
+        inputBusqueda.addEventListener('input', (evento) => {
+          evaluarBannerZTechDinamico(evento.target.value, estadoFiltroCategoria);
+        });
       }
     });
 
     async function escanearEnVivo() {
-      const input = document.getElementById('search-input');
-      const query = (input.value || 'samsung').trim();
-      const btn = document.getElementById('btn-escanear-vivo');
-      const label = document.getElementById('label-scan');
-      const icon = document.getElementById('icon-scan');
-      const toast = document.getElementById('scan-toast');
+      const input = document.getElementById('input-query');
+      const btn = document.getElementById('btn-escanear');
+      const icon = document.getElementById('icon-escanear');
+      const texto = document.getElementById('texto-escanear');
+      const estado = document.getElementById('estado-escaneo');
+
+      const termino = (input.value || '').trim() || 'laptop';
+      input.value = termino;
+      evaluarBannerZTechDinamico(termino, estadoFiltroCategoria);
 
       btn.disabled = true;
       icon.classList.add('animate-spin');
-      label.textContent = 'Escaneando...';
-      toast.className = 'mt-4 rounded-xl border border-white/[0.12] bg-[#131822] px-4 py-3 text-sm text-zinc-200';
-      toast.classList.remove('hidden');
-      toast.textContent = `Consultando Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko, La Torre y Max para "${query}"...`;
+      texto.textContent = 'Escaneando 16 tiendas...';
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+      estado.className = 'mt-4 text-xs font-medium px-4 py-2.5 rounded-xl border bg-emerald-950/40 border-emerald-500/30 text-emerald-300 block';
+      estado.textContent = `Consultando Intelaf, La Curacao, Tienda Claro, Tecno Fácil, PriceSmart, Siman, Elektra, iShop, Walmart, Cemaco y Pacifiko para "${termino}"...`;
 
       try {
         const resp = await fetch('/api/escanear', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify({ query }),
-          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ query: termino })
         });
-        clearTimeout(timeoutId);
 
         const rawText = await resp.text();
         let data = null;
         try {
-          data = rawText ? JSON.parse(rawText) : {};
-        } catch (_parseErr) {
-          throw new Error(
-            'El servidor tardó demasiado o devolvió una respuesta temporal no válida. Intenta de nuevo en unos segundos.'
-          );
+          data = JSON.parse(rawText);
+        } catch (_jsonErr) {
+          throw new Error('El servidor tardó demasiado en responder. Recarga la página para ver los precios ya guardados en Neon DB.');
         }
 
         if (!resp.ok || data.status === 'error') {
-          throw new Error(data.detail || 'Error controlado durante el escaneo de tiendas.');
+          throw new Error(data.detail || 'Error durante el escaneo.');
         }
 
-        const nuevasOfertas = data.nuevas_ofertas ?? data.insertados_neon ?? 0;
+        const nuevas = data.nuevas_ofertas ?? data.insertados_neon ?? 0;
+        const relevantes = data.evaluados_relevantes ?? 0;
         const descartados = data.descartados_ruido ?? 0;
-        toast.className = 'mt-4 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200';
-        toast.textContent = `¡Escaneo completado! ${nuevasOfertas} nuevos cambios de precio guardados en Neon DB (${descartados} accesorios filtrados | Oficiales Siman/Elektra/iShop: ${data.extraidos_oficiales ?? 0}, Walmart/Paiz/Maxi: ${data.extraidos_walmart ?? 0}, Cemaco: ${data.extraidos_cemaco ?? 0}, Pacifiko: ${data.extraidos_pacifiko ?? 0}). Recargando...`;
-
-        setTimeout(() => {
-          window.location.href = `/?q=${encodeURIComponent(query)}`;
-        }, 950);
+        estado.textContent = `¡Escaneo v3.0 completado! ${relevantes} ofertas relevantes (${descartados} accesorios descartados). ${nuevas} variaciones de precio guardadas en Neon DB.`;
+        window.location.href = '/?q=' + encodeURIComponent(termino);
       } catch (err) {
-        clearTimeout(timeoutId);
-        toast.className = 'mt-4 rounded-xl border border-red-500/30 bg-red-950/30 px-4 py-3 text-sm text-red-200';
-        const msg = err.name === 'AbortError'
-          ? 'El escaneo superó el tiempo límite de espera (35s). Recarga la página para ver las ofertas procesadas.'
-          : err.message;
-        toast.textContent = `Aviso al escanear: ${msg}`;
+        estado.className = 'mt-4 text-xs font-medium px-4 py-2.5 rounded-xl border bg-red-950/50 border-red-500/30 text-red-300 block';
+        estado.textContent = 'Aviso: ' + err.message;
         btn.disabled = false;
         icon.classList.remove('animate-spin');
-        label.textContent = 'Escanear Tiendas';
+        texto.textContent = 'Escanear Tiendas';
       }
     }
   </script>

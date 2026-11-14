@@ -144,15 +144,28 @@ class PostgresOfertaRepository(OfertaRepository):
             raise
 
     @staticmethod
-    def _asegurar_tienda(cursor, nombre_tienda: str) -> tuple[str, bool, Decimal]:
+    def _normalizar_slug_tienda(nombre_tienda: str) -> str:
+        reemplazos = str.maketrans("áéíóúÁÉÍÓÚñÑ", "aeiouAEIOUnN")
+        limpio = nombre_tienda.strip().translate(reemplazos).lower()
+        slug = "-".join(limpio.split())
+        if slug == "tecnofacil":
+            return "tecno-facil"
+        return slug
+
+    @classmethod
+    def _asegurar_tienda(cls, cursor, nombre_tienda: str) -> tuple[str, bool, Decimal]:
         """Obtiene (o crea si no existe) el registro de la tienda en la tabla `tiendas`."""
-        slug = nombre_tienda.strip().lower().replace(" ", "-")
+        slug = cls._normalizar_slug_tienda(nombre_tienda)
         urls_conocidas = {
             "kemik": "https://www.kemik.gt",
             "pacifiko": "https://www.pacifiko.com",
             "la-torre": "https://www.latorre.com.gt",
             "tiendas-max": "https://www.max.com.gt",
+            "tecno-facil": "https://www.tecnofacil.com.gt",
             "tecnofacil": "https://www.tecnofacil.com.gt",
+            "la-curacao": "https://www.lacuracaonline.com/guatemala",
+            "tienda-claro": "https://www.claro.com.gt",
+            "intelaf": "https://www.intelaf.com",
             "cemaco": "https://www.cemaco.com",
             "walmart": "https://www.walmart.com.gt",
             "paiz": "https://www.paiz.com.gt",
@@ -160,7 +173,7 @@ class PostgresOfertaRepository(OfertaRepository):
             "siman": "https://gt.siman.com",
             "elektra": "https://www.elektra.com.gt",
             "ishop": "https://ishop.gt",
-            "pricesmart": "https://www.pricesmart.com/es-gt",
+            "pricesmart": "https://www.pricesmart.com/en-GT",
         }
         url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
         cursor.execute(
@@ -195,6 +208,172 @@ class PostgresOfertaRepository(OfertaRepository):
         return str(row[0])
 
     @staticmethod
+    def clasificar_categoria_ui(titulo: str, tienda_slug: str = "") -> str:
+        """
+        Clasifica cualquier producto en una de las 5 Categorías Principales de tecHunter v3.0:
+          - 'computo'        -> 💻 Cómputo y Laptops
+          - 'smartphones'    -> 📱 Smartphones
+          - 'hogar'          -> 🏠 Línea Blanca y Hogar
+          - 'herramientas'   -> 🔨 Herramientas
+          - 'super-mascotas' -> 🛒 Súper y Mascotas
+        """
+        t = (titulo or "").lower()
+        s = (tienda_slug or "").lower()
+
+        if any(
+            k in t
+            for k in (
+                "pedigree",
+                "purina",
+                "dog chow",
+                "pro plan",
+                "beneful",
+                "whiskas",
+                "croqueta",
+                "perro",
+                "gato",
+                "mascota",
+                "alimento para",
+                "ruccan",
+                "supermercado",
+                "despensa",
+            )
+        ) or s == "la-torre":
+            return "super-mascotas"
+
+        if any(
+            k in t
+            for k in (
+                "taladro",
+                "esmeriladora",
+                "martillo",
+                "destornillador",
+                "sierra",
+                "lijadora",
+                "llave ",
+                "herramienta",
+                "truper",
+                "pretul",
+                "dewalt",
+                "makita",
+                "stanley",
+                "black+decker",
+                "black and decker",
+                "black & decker",
+                "emtop",
+                "compresor",
+                "soldadora",
+                "rotomartillo",
+                "atornillador",
+            )
+        ):
+            return "herramientas"
+
+        if any(
+            k in t
+            for k in (
+                "celular",
+                "smartphone",
+                "iphone",
+                "galaxy a",
+                "galaxy s",
+                "galaxy z",
+                "redmi",
+                "poco ",
+                "motorola",
+                "moto g",
+                "honor ",
+                "prepago claro",
+                "postpago",
+                "galaxy watch",
+                "apple watch",
+                "smartwatch",
+            )
+        ) or s == "tienda-claro":
+            return "smartphones"
+
+        if any(
+            k in t
+            for k in (
+                "laptop",
+                "notebook",
+                "portatil",
+                "portátil",
+                "macbook",
+                "imac",
+                "mac mini",
+                "workstation",
+                "computadora",
+                "monitor",
+                "ultragear",
+                "odyssey",
+                "rtx",
+                "geforce",
+                "radeon",
+                "ryzen",
+                "intel core",
+                "ssd",
+                "nvme",
+                "ddr4",
+                "ddr5",
+                "teclado",
+                "mouse",
+                "volante",
+                "g29",
+                "logitech",
+                "impresora",
+                "router",
+                "playstation",
+                "ps5",
+                "xbox",
+                "nintendo",
+                "ipad",
+                "tablet",
+            )
+        ) or s == "intelaf":
+            return "computo"
+
+        if any(
+            k in t
+            for k in (
+                "refrigeradora",
+                "frigobar",
+                "lavadora",
+                "secadora",
+                "estufa",
+                "microondas",
+                "licuadora",
+                "cafetera",
+                "freidora",
+                "ventilador",
+                "aire acondicionado",
+                "aspiradora",
+                "plancha",
+                "horno",
+                "smart tv",
+                "televisor",
+                "pulgadas",
+                "led ",
+                "qled",
+                "oled",
+                "cristal",
+                "crystal",
+                "soundbar",
+                "sistema de sonido",
+                "barra de sonido",
+                "mabe",
+                "whirlpool",
+                "frigidaire",
+                "oster",
+                "hamilton beach",
+                "hogar",
+            )
+        ):
+            return "hogar"
+
+        return "computo"
+
+    @staticmethod
     def _inferir_marca(titulo: str) -> str | None:
         titulo_lower = titulo.lower()
         marcas_conocidas = [
@@ -209,6 +388,7 @@ class PostgresOfertaRepository(OfertaRepository):
             "Redragon",
             "Razer",
             "Sony",
+            "PlayStation",
             "Samsung",
             "Apple",
             "iPhone",
@@ -218,6 +398,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "LG",
             "Whirlpool",
             "Mabe",
+            "Frigidaire",
+            "Oster",
+            "Hamilton Beach",
             "Bosch",
             "Truper",
             "Pretul",
@@ -229,6 +412,7 @@ class PostgresOfertaRepository(OfertaRepository):
             "Black And Decker",
             "Emtop",
             "Xiaomi",
+            "Redmi",
             "Motorola",
             "Honor",
             "Hisense",
@@ -239,6 +423,7 @@ class PostgresOfertaRepository(OfertaRepository):
             "Dell",
             "Acer",
             "MSI",
+            "RCA",
             "Garmin",
             "JBL",
             "Bose",
@@ -249,6 +434,10 @@ class PostgresOfertaRepository(OfertaRepository):
                     return "Black+Decker"
                 if marca in {"iPhone", "iPad", "MacBook"}:
                     return "Apple"
+                if marca == "Redmi":
+                    return "Xiaomi"
+                if marca == "PlayStation":
+                    return "Sony"
                 return marca
         return None
 
@@ -426,15 +615,18 @@ class PostgresOfertaRepository(OfertaRepository):
             conn.close()
 
     def buscar_ofertas_comparadas(
-        self, query: str = "", tienda_slug: str = ""
+        self, query: str = "", tienda_slug: str = "", categoria_ui: str = ""
     ) -> list[dict[str, Any]]:
         """
         Obtiene la última oferta por (producto, tienda) desde Neon DB,
-        filtrando por palabras clave, tienda opcional y el Filtro Inteligente Anti-Ruido,
-        ordenadas por precio ascendente.
+        filtrando por palabras clave, tienda opcional, categoría UI opcional
+        y el Filtro Inteligente Anti-Ruido, ordenadas por precio ascendente.
         """
         tokens = [t.strip() for t in query.strip().split() if t.strip()]
         tienda_limpia = tienda_slug.strip().lower()
+        if tienda_limpia == "tecnofacil":
+            tienda_limpia = "tecno-facil"
+        categoria_limpia = categoria_ui.strip().lower()
 
         condiciones = ["p.activo = TRUE", "t.activo = TRUE"]
         params: list[Any] = []
@@ -444,7 +636,11 @@ class PostgresOfertaRepository(OfertaRepository):
             "pacifiko",
             "la-torre",
             "tiendas-max",
+            "tecno-facil",
             "tecnofacil",
+            "la-curacao",
+            "tienda-claro",
+            "intelaf",
             "cemaco",
             "walmart",
             "paiz",
@@ -454,8 +650,12 @@ class PostgresOfertaRepository(OfertaRepository):
             "ishop",
             "pricesmart",
         }:
-            condiciones.append("t.slug = %s")
-            params.append(tienda_limpia)
+            if tienda_limpia == "tecno-facil":
+                condiciones.append("t.slug IN (%s, %s)")
+                params.extend(["tecno-facil", "tecnofacil"])
+            else:
+                condiciones.append("t.slug = %s")
+                params.append(tienda_limpia)
 
         for token in tokens:
             patron = f"%{token}%"
@@ -499,19 +699,37 @@ class PostgresOfertaRepository(OfertaRepository):
 
         resultados: list[dict[str, Any]] = []
         for fila in filas:
+            titulo_str = str(fila[1])
+            slug_tienda_str = str(fila[4])
+            if slug_tienda_str == "tecnofacil":
+                slug_tienda_str = "tecno-facil"
+            cat_ui = self.clasificar_categoria_ui(titulo_str, slug_tienda_str)
             resultados.append(
                 {
                     "producto_id": str(fila[0]),
-                    "titulo": str(fila[1]),
+                    "titulo": titulo_str,
                     "marca": str(fila[2] or ""),
                     "imagen_url": str(fila[3] or ""),
-                    "tienda_slug": str(fila[4]),
+                    "tienda_slug": slug_tienda_str,
                     "tienda": str(fila[5]),
                     "precio_gtq": float(fila[6]),
                     "costo_envio_gtq": float(fila[7]),
                     "costo_real_gtq": float(fila[8]),
                     "url": str(fila[9]),
                     "scraped_at": str(fila[10]),
+                    "categoria_ui": cat_ui,
+                    "requiere_membresia": slug_tienda_str == "pricesmart",
                 }
             )
-        return filtrar_dicts_relevantes(resultados, query)
+
+        filtrados = filtrar_dicts_relevantes(resultados, query)
+        if categoria_limpia in {
+            "computo",
+            "smartphones",
+            "hogar",
+            "herramientas",
+            "super-mascotas",
+        }:
+            return [o for o in filtrados if o.get("categoria_ui") == categoria_limpia]
+        return filtrados
+
