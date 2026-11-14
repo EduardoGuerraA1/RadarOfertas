@@ -26,7 +26,11 @@ from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
+from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
+from radar_ofertas.infrastructure.scrapers.tiendas_oficiales_scraper import (
+    TiendasOficialesScraper,
+)
 from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 logger = logging.getLogger("tecHunter.api")
@@ -38,18 +42,72 @@ app = FastAPI(
     title="tecHunter — Comparador de Precios en Guatemala",
     description=(
         "Plataforma de comparación de precios en tiempo real "
-        "(Kemik, Pacifiko, La Torre, Tiendas Max, Cemaco, Walmart, Paiz y Maxi Despensa) "
-        "respaldada por Neon DB."
+        "(Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, "
+        "La Torre, Tiendas Max, Cemaco y PriceSmart) respaldada por Neon DB."
     ),
-    version="2.0.0",
+    version="2.5.0",
 )
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+TERMINOS_ZTECH_COMPUTO: tuple[str, ...] = (
+    "laptop",
+    "notebook",
+    "workstation",
+    "computadora",
+    "pc",
+    "macbook",
+    "imac",
+    "mac mini",
+    "monitor",
+    "pantalla",
+    "rtx",
+    "gtx",
+    "radeon",
+    "gpu",
+    "tarjeta grafica",
+    "procesador",
+    "ryzen",
+    "intel",
+    "core i",
+    "ram",
+    "ssd",
+    "nvme",
+    "teclado",
+    "mouse",
+    "gamer",
+    "gaming",
+    "volante",
+    "g29",
+    "logitech",
+    "asus",
+    "lenovo",
+    "thinkpad",
+    "hp",
+    "dell",
+    "alienware",
+    "msi",
+    "acer",
+    "razer",
+    "servidor",
+    "nas",
+)
 
 
 class EscanearRequest(BaseModel):
     query: str = ""
     categoria: str = ""
+
+
+def _es_busqueda_computo_ztech(query: str) -> bool:
+    """
+    Determina si la búsqueda actual pertenece al vertical de cómputo, laptops,
+    workstations o hardware especializado para destacar el banner de Z-Tech Imports.
+    """
+    q_lower = (query or "").strip().lower()
+    if not q_lower:
+        return True
+    return any(termino in q_lower for termino in TERMINOS_ZTECH_COMPUTO)
 
 
 def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> str:
@@ -84,6 +142,10 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
         "stanley",
         "lampara",
         "ventilador",
+        "refrigeradora",
+        "lavadora",
+        "microondas",
+        "estufa",
         "hogar",
     )
     if any(p in q_lower for p in palabras_hogar):
@@ -104,6 +166,10 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             "total_walmart": 0,
             "total_paiz": 0,
             "total_maxi_despensa": 0,
+            "total_siman": 0,
+            "total_elektra": 0,
+            "total_ishop": 0,
+            "total_pricesmart": 0,
             "mejor_oferta": None,
             "ahorro_maximo_gtq": 0.0,
         }
@@ -125,6 +191,12 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
         "total_paiz": sum(1 for o in ofertas if o["tienda_slug"] == "paiz"),
         "total_maxi_despensa": sum(
             1 for o in ofertas if o["tienda_slug"] == "maxi-despensa"
+        ),
+        "total_siman": sum(1 for o in ofertas if o["tienda_slug"] == "siman"),
+        "total_elektra": sum(1 for o in ofertas if o["tienda_slug"] == "elektra"),
+        "total_ishop": sum(1 for o in ofertas if o["tienda_slug"] == "ishop"),
+        "total_pricesmart": sum(
+            1 for o in ofertas if o["tienda_slug"] == "pricesmart"
         ),
         "mejor_oferta": mejor,
         "ahorro_maximo_gtq": round(ahorro, 2),
@@ -165,7 +237,7 @@ async def vista_comparador(
     q: str = Query(default="", description="Término de búsqueda en Neon DB"),
     tienda: str = Query(
         default="",
-        description="Filtro por tienda: kemik, pacifiko, la-torre, tiendas-max, cemaco, walmart, paiz o maxi-despensa",
+        description="Filtro por tienda: siman, elektra, ishop, walmart, paiz, maxi-despensa, kemik, pacifiko, la-torre, tiendas-max, cemaco o pricesmart",
     ),
 ) -> HTMLResponse:
     error_db: str | None = None
@@ -181,6 +253,7 @@ async def vista_comparador(
         error_db = str(error)
 
     resumen = _calcular_resumen(ofertas)
+    destacar_ztech = _es_busqueda_computo_ztech(q)
 
     return templates.TemplateResponse(
         request=request,
@@ -190,6 +263,7 @@ async def vista_comparador(
             "tienda_activa": tienda.lower().strip(),
             "ofertas": ofertas,
             "resumen": resumen,
+            "destacar_ztech": destacar_ztech,
             "error_db": error_db,
         },
     )
@@ -208,6 +282,7 @@ async def api_listar_ofertas(
         return {
             "query": q,
             "tienda": tienda,
+            "destacar_ztech": _es_busqueda_computo_ztech(q),
             "resumen": _calcular_resumen(ofertas),
             "ofertas": ofertas,
         }
@@ -245,6 +320,8 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         )
         cemaco_scraper = CemacoScraper(timeout_s=10)
         walmart_scraper = WalmartScraper(timeout_s=10)
+        oficiales_scraper = TiendasOficialesScraper(timeout_s=10)
+        pricesmart_scraper = PriceSmartScraper()
 
         resultados = await asyncio.gather(
             _ejecutar_scraper_seguro(kemik_scraper, "Kemik", termino, timeout_s=8.0),
@@ -261,6 +338,12 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
             _ejecutar_scraper_seguro(
                 walmart_scraper, "Grupo Walmart", termino, timeout_s=14.0
             ),
+            _ejecutar_scraper_seguro(
+                oficiales_scraper, "Oficiales (Siman/Elektra/iShop)", termino, timeout_s=14.0
+            ),
+            _ejecutar_scraper_seguro(
+                pricesmart_scraper, "PriceSmart", termino, timeout_s=8.0
+            ),
         )
 
         (ofertas_kemik, err_kemik) = resultados[0]
@@ -269,6 +352,8 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         (ofertas_max, err_max) = resultados[3]
         (ofertas_cemaco, err_cemaco) = resultados[4]
         (ofertas_walmart, err_walmart) = resultados[5]
+        (ofertas_oficiales, err_oficiales) = resultados[6]
+        (ofertas_pricesmart, err_pricesmart) = resultados[7]
 
         advertencias = [
             err
@@ -279,6 +364,8 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
                 err_max,
                 err_cemaco,
                 err_walmart,
+                err_oficiales,
+                err_pricesmart,
             )
             if err is not None
         ]
@@ -290,8 +377,14 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
             *ofertas_max,
             *ofertas_cemaco,
             *ofertas_walmart,
+            *ofertas_oficiales,
+            *ofertas_pricesmart,
         ]
-        unificadas = filtrar_ofertas_relevantes(unificadas_brutas, termino)
+        unificadas = [
+            o
+            for o in filtrar_ofertas_relevantes(unificadas_brutas, termino)
+            if o.precio_gtq > 0 and o.estado_precio_membresia != "oculto_requiere_login"
+        ]
         descartados_ruido = len(unificadas_brutas) - len(unificadas)
 
         insertados = 0
@@ -322,6 +415,8 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
                 "extraidos_tiendas_max": len(ofertas_max),
                 "extraidos_cemaco": len(ofertas_cemaco),
                 "extraidos_walmart": len(ofertas_walmart),
+                "extraidos_oficiales": len(ofertas_oficiales),
+                "extraidos_pricesmart": len(ofertas_pricesmart),
                 "insertados_neon": insertados,
                 "advertencias": advertencias,
             },

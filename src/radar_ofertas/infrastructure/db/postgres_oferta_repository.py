@@ -157,6 +157,10 @@ class PostgresOfertaRepository(OfertaRepository):
             "walmart": "https://www.walmart.com.gt",
             "paiz": "https://www.paiz.com.gt",
             "maxi-despensa": "https://www.maxidespensa.com.gt",
+            "siman": "https://gt.siman.com",
+            "elektra": "https://www.elektra.com.gt",
+            "ishop": "https://ishop.gt",
+            "pricesmart": "https://www.pricesmart.com/es-gt",
         }
         url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
         cursor.execute(
@@ -207,6 +211,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "Sony",
             "Samsung",
             "Apple",
+            "iPhone",
+            "iPad",
+            "MacBook",
             "Nintendo",
             "LG",
             "Whirlpool",
@@ -222,12 +229,27 @@ class PostgresOfertaRepository(OfertaRepository):
             "Black And Decker",
             "Emtop",
             "Xiaomi",
+            "Motorola",
+            "Honor",
+            "Hisense",
+            "TCL",
+            "Asus",
+            "Lenovo",
+            "HP",
+            "Dell",
+            "Acer",
+            "MSI",
             "Garmin",
             "JBL",
+            "Bose",
         ]
         for marca in marcas_conocidas:
             if marca.lower() in titulo_lower:
-                return "Black+Decker" if "black" in marca.lower() else marca
+                if "black" in marca.lower():
+                    return "Black+Decker"
+                if marca in {"iPhone", "iPad", "MacBook"}:
+                    return "Apple"
+                return marca
         return None
 
     @classmethod
@@ -317,8 +339,8 @@ class PostgresOfertaRepository(OfertaRepository):
     ) -> int:
         """
         Persiste productos en `productos` e inserta un nuevo registro en
-        `historial_precios` ÚNICAMENTE si el precio actual cambió respecto al
-        último precio registrado para esa tienda y producto (optimización de espacio en DB).
+        `historial_precios` ÚNICAMENTE si el precio actual es válido (> 0) y cambió
+        respecto al último precio registrado para esa tienda y producto.
         """
         if not ofertas:
             return 0
@@ -333,6 +355,14 @@ class PostgresOfertaRepository(OfertaRepository):
                     cache_tiendas: dict[str, tuple[str, bool, Decimal]] = {}
 
                     for oferta in ofertas:
+                        if (
+                            oferta.precio_gtq <= 0
+                            or getattr(oferta, "estado_precio_membresia", "publico")
+                            == "oculto_requiere_login"
+                        ):
+                            omitidos_sin_cambio += 1
+                            continue
+
                         if oferta.tienda not in cache_tiendas:
                             cache_tiendas[oferta.tienda] = self._asegurar_tienda(
                                 cursor, oferta.tienda
@@ -419,6 +449,10 @@ class PostgresOfertaRepository(OfertaRepository):
             "walmart",
             "paiz",
             "maxi-despensa",
+            "siman",
+            "elektra",
+            "ishop",
+            "pricesmart",
         }:
             condiciones.append("t.slug = %s")
             params.append(tienda_limpia)

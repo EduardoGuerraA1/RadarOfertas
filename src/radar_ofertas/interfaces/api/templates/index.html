@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>tecHunter GT — Inteligencia y Comparación de Precios en Guatemala</title>
-  <meta name="description" content="Plataforma de comparación de precios en tiempo real en Guatemala: Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, La Torre, Tiendas Max y Cemaco." />
+  <meta name="description" content="Plataforma de comparación de precios en tiempo real en Guatemala: Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, La Torre, Tiendas Max, Cemaco y PriceSmart." />
 
   <!-- Google Fonts: Plus Jakarta Sans + JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Tailwind CSS CDN (solicitado en arquitectura FastAPI + Tailwind de tecHunter) -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -63,7 +63,14 @@
     .surface-card-best:hover {
       border-color: rgba(52, 211, 153, 0.55);
     }
-    /* Scrollbar sutil */
+    .native-ad-ztech {
+      background: linear-gradient(135deg, #111622 0%, #0D1118 100%);
+      border: 1px solid rgba(56, 189, 248, 0.24);
+    }
+    .native-ad-nova {
+      background: linear-gradient(135deg, #12151C 0%, #0D1015 100%);
+      border: 1px solid rgba(245, 158, 11, 0.22);
+    }
     ::-webkit-scrollbar {
       width: 8px;
       height: 8px;
@@ -89,7 +96,7 @@
         <div class="flex items-baseline gap-2">
           <span class="font-semibold text-base tracking-tight text-zinc-100">tecHunter</span>
           <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-400 border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 rounded">
-            GT · v2.0
+            GT · v2.5
           </span>
         </div>
       </a>
@@ -113,18 +120,18 @@
   <main class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
 
     <!-- Cabecera Editorial y Buscador Principal -->
-    <section class="mb-8">
+    <section class="mb-7">
       <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-400 mb-1.5">
-            Índice Multi-Tienda en Quetzales (GTQ)
+            Índice Multi-Tienda &amp; Distribuidores Oficiales (GTQ)
           </p>
           <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-100">
             Comparador de Precios en Tiempo Real
           </h1>
         </div>
         <p class="text-xs sm:text-sm text-zinc-400 max-w-md">
-          Monitoreo unificado en <span class="text-zinc-200 font-medium">Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, La Torre, Tiendas Max y Cemaco</span> sin ruido de accesorios.
+          Monitoreo oficial en <span class="text-zinc-200 font-medium">Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Kemik, Pacifiko, La Torre, Max, Cemaco y PriceSmart</span>.
         </p>
       </div>
 
@@ -145,10 +152,11 @@
             id="search-input"
             name="q"
             value="{{ query }}"
-            placeholder="Buscar producto principal (ej. pedigree, galaxy watch, taladro, volante logitech)..."
+            oninput="evaluarBannerZTechDinamico(this.value)"
+            placeholder="Buscar smartphones, laptops, pantallas LG/Samsung, hogar o supermercado..."
             class="block w-full rounded-xl border border-white/[0.10] bg-[#11151C] py-3 pl-11 pr-12 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-400 focus:bg-[#141922] focus:outline-none transition-all"
           />
-          <kbd class="hidden sm:inline-flex items-center position absolute right-3.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-white/[0.04] border border-white/[0.07] rounded">
+          <kbd class="hidden sm:inline-flex items-center absolute right-3.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-white/[0.04] border border-white/[0.07] rounded">
             /
           </kbd>
         </div>
@@ -166,7 +174,7 @@
             type="button"
             id="btn-escanear-vivo"
             onclick="escanearEnVivo()"
-            title="Ejecuta los scrapers en vivo, filtra accesorios irrelevantes y guarda solo cambios de precio en Neon DB"
+            title="Ejecuta los scrapers oficiales y de retail en vivo, filtra accesorios y guarda solo cambios de precio en Neon DB"
             class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-xl border border-white/[0.12] bg-[#141922] px-4 py-3 text-sm font-medium text-zinc-200 hover:bg-[#1B212D] hover:border-white/[0.22] focus:outline-none transition-colors"
           >
             <svg id="icon-scan" class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -188,6 +196,30 @@
             class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if not tienda_activa %}bg-zinc-100 text-zinc-950 font-semibold{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-zinc-200 hover:border-white/[0.15]{% endif %}"
           >
             Todas <span class="font-mono text-[11px] opacity-75">({{ resumen.total }})</span>
+          </a>
+
+          <a
+            href="/?q={{ query | urlencode }}&tienda=siman"
+            id="filter-siman"
+            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'siman' %}bg-rose-500/20 text-rose-200 border border-rose-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-rose-300 hover:border-rose-500/30{% endif %}"
+          >
+            Siman <span class="font-mono text-[11px] opacity-75">({{ resumen.total_siman }})</span>
+          </a>
+
+          <a
+            href="/?q={{ query | urlencode }}&tienda=elektra"
+            id="filter-elektra"
+            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'elektra' %}bg-amber-500/20 text-amber-200 border border-amber-400/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-amber-300 hover:border-amber-500/30{% endif %}"
+          >
+            Elektra <span class="font-mono text-[11px] opacity-75">({{ resumen.total_elektra }})</span>
+          </a>
+
+          <a
+            href="/?q={{ query | urlencode }}&tienda=ishop"
+            id="filter-ishop"
+            class="px-2.5 py-1 rounded-lg font-medium transition-colors {% if tienda_activa == 'ishop' %}bg-zinc-200/20 text-zinc-100 border border-zinc-300/40{% else %}bg-[#11151C] border border-white/[0.07] text-zinc-400 hover:text-zinc-200 hover:border-zinc-400/30{% endif %}"
+          >
+            iShop <span class="font-mono text-[11px] opacity-75">({{ resumen.total_ishop }})</span>
           </a>
 
           <a
@@ -257,13 +289,15 @@
 
         <div class="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
           <span class="font-mono text-[11px]">Radar rápido:</span>
-          <a href="/?q=pedigree" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">pedigree</a>
+          <a href="/?q=samsung" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">samsung</a>
+          <span>·</span>
+          <a href="/?q=lg" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">lg</a>
+          <span>·</span>
+          <a href="/?q=laptop" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">laptop</a>
           <span>·</span>
           <a href="/?q=galaxy+watch" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">galaxy watch</a>
           <span>·</span>
-          <a href="/?q=taladro" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">taladro</a>
-          <span>·</span>
-          <a href="/?q=volante+logitech" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">volante logitech</a>
+          <a href="/?q=pedigree" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">pedigree</a>
           <span>·</span>
           <a href="/" class="text-zinc-400 hover:text-zinc-100 underline decoration-white/20 underline-offset-4 transition-colors">ver todo</a>
         </div>
@@ -272,6 +306,50 @@
       <!-- Notificación de Escaneo en Vivo -->
       <div id="scan-toast" class="hidden mt-4 rounded-xl border border-white/[0.12] bg-[#131822] px-4 py-3 text-sm text-zinc-200"></div>
     </section>
+
+    <!-- ANUNCIO NATIVO DE LA CASA #1: Z-Tech Imports (Dinámico en Cómputo, Laptops y Workstations) -->
+    <aside
+      id="ztech-imports-banner"
+      aria-label="Z-Tech Imports — Importación Directa"
+      class="mb-7 rounded-xl native-ad-ztech p-4 sm:p-5 transition-all {% if not destacar_ztech %}hidden{% endif %}"
+    >
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-start gap-3.5">
+          <div class="w-10 h-10 rounded-lg bg-sky-500/15 border border-sky-400/30 text-sky-300 flex items-center justify-center font-mono font-bold text-xs shrink-0 mt-0.5">
+            Z·T
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-400/25 font-semibold">
+                Holding Partner · Z-Tech Imports GT
+              </span>
+              <span class="text-xs text-zinc-400 font-mono">
+                Importación Directa Bajo Pedido
+              </span>
+            </div>
+            <h2 class="text-sm sm:text-base font-semibold text-zinc-100">
+              ¿Buscas Laptops, Workstations, GPUs o Hardware Especializado a mejor precio que el retail local?
+            </h2>
+            <p class="mt-0.5 text-xs sm:text-sm text-zinc-400">
+              En <strong class="text-zinc-200">Z-Tech Imports</strong> cotizamos e importamos tu configuración exacta directo de fábrica/ distribuidor mayorista en EE. UU. con garantía local y ahorro de hasta un <span class="text-sky-300 font-mono font-semibold">18%–25%</span> frente a tienda departamental.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 shrink-0">
+          <a
+            id="cta-ztech-imports"
+            href="https://wa.me/50200000000?text={{ ('Hola Z-Tech Imports, vi en tecHunter la búsqueda de ' ~ (query or 'Workstation / Laptop') ~ ' y deseo cotizar bajo pedido directo.') | urlencode }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-sky-400 px-4 py-2.5 text-xs font-semibold text-zinc-950 hover:bg-sky-300 transition-colors"
+          >
+            <span id="cta-ztech-label">Cotizar "{{ query or 'Workstation / Laptop' }}" en Z-Tech</span>
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+    </aside>
 
     {% if error_db %}
     <!-- Alerta de Error de Base de Datos -->
@@ -326,7 +404,7 @@
           </span>
         </div>
         <p class="mt-1.5 text-xs text-zinc-500 truncate">
-          Walmart ({{ resumen.total_walmart }}) · Paiz ({{ resumen.total_paiz }}) · Maxi ({{ resumen.total_maxi_despensa }}) · Cemaco ({{ resumen.total_cemaco }}) · Pacifiko ({{ resumen.total_pacifiko }}) · La Torre ({{ resumen.total_la_torre }}) · Max ({{ resumen.total_tiendas_max }}) · Kemik ({{ resumen.total_kemik }})
+          Siman ({{ resumen.total_siman }}) · Elektra ({{ resumen.total_elektra }}) · iShop ({{ resumen.total_ishop }}) · Walmart/Paiz/Maxi ({{ resumen.total_walmart + resumen.total_paiz + resumen.total_maxi_despensa }}) · Cemaco ({{ resumen.total_cemaco }}) · Pacifiko ({{ resumen.total_pacifiko }})
         </p>
       </div>
     </section>
@@ -378,7 +456,23 @@
           <div class="flex-1 min-w-0">
             <div class="flex flex-wrap items-center gap-2 mb-1.5">
               <!-- Insignia de Tienda -->
-              {% if oferta.tienda_slug == 'walmart' %}
+              {% if oferta.tienda_slug == 'siman' %}
+              <span class="inline-flex items-center rounded-md bg-rose-500/15 px-2.5 py-0.5 text-xs font-medium text-rose-300 border border-rose-400/25">
+                Siman Oficial
+              </span>
+              {% elif oferta.tienda_slug == 'elektra' %}
+              <span class="inline-flex items-center rounded-md bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300 border border-amber-400/25">
+                Elektra Oficial
+              </span>
+              {% elif oferta.tienda_slug == 'ishop' %}
+              <span class="inline-flex items-center rounded-md bg-zinc-200/15 px-2.5 py-0.5 text-xs font-medium text-zinc-200 border border-zinc-300/25">
+                iShop Oficial
+              </span>
+              {% elif oferta.tienda_slug == 'pricesmart' %}
+              <span class="inline-flex items-center rounded-md bg-blue-500/15 px-2.5 py-0.5 text-xs font-medium text-blue-200 border border-blue-400/25">
+                PriceSmart · Socios Club
+              </span>
+              {% elif oferta.tienda_slug == 'walmart' %}
               <span class="inline-flex items-center rounded-md bg-sky-500/15 px-2.5 py-0.5 text-xs font-medium text-sky-300 border border-sky-400/25">
                 Walmart GT
               </span>
@@ -482,7 +576,7 @@
         Sin registros principales en Neon DB para "{{ query }}"
       </h2>
       <p class="mt-1.5 text-sm text-zinc-400 max-w-md mx-auto">
-        Ejecuta un escaneo en vivo en los 8 comercios haciendo clic en <strong class="text-zinc-200">"Escanear Tiendas"</strong> o consulta todo el catálogo sincronizado.
+        Ejecuta un escaneo en vivo en los distribuidores oficiales y supermercados haciendo clic en <strong class="text-zinc-200">"Escanear Tiendas"</strong> o consulta todo el catálogo sincronizado.
       </p>
       <div class="mt-6 flex justify-center gap-3">
         <a
@@ -496,23 +590,102 @@
           onclick="escanearEnVivo()"
           class="inline-flex items-center rounded-xl border border-white/[0.12] bg-[#141922] px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:bg-[#1B212D] transition-colors"
         >
-          Escanear "{{ query or 'pedigree' }}" en vivo
+          Escanear "{{ query or 'samsung' }}" en vivo
         </button>
       </div>
     </section>
     {% endif %}
 
+    <!-- ANUNCIO NATIVO DE LA CASA #2: Nova Viventia Travel (Tarjeta Secundaria / Pre-Footer) -->
+    <section
+      id="nova-viventia-banner"
+      aria-label="Nova Viventia Travel — Experiencias y Viajes"
+      class="mt-10 rounded-xl native-ad-nova p-5 sm:p-6"
+    >
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-start gap-3.5">
+          <div class="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-300 flex items-center justify-center font-mono font-bold text-xs shrink-0 mt-0.5">
+            NV
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-1">
+              <span class="font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-400/25 font-semibold">
+                Holding Lifestyle · Nova Viventia Travel
+              </span>
+              {% if resumen.ahorro_maximo_gtq and resumen.ahorro_maximo_gtq > 0 %}
+              <span class="text-xs text-emerald-300 font-mono">
+                Invierte tus Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }} de ahorro en tu próxima experiencia
+              </span>
+              {% endif %}
+            </div>
+            <h2 class="text-sm sm:text-base font-semibold text-zinc-100">
+              Convierte el ahorro inteligente de tus compras en tecnología y hogar en tu próximo viaje
+            </h2>
+            <p class="mt-0.5 text-xs sm:text-sm text-zinc-400">
+              Con <strong class="text-zinc-200">Nova Viventia Travel</strong> diseñamos escapadas a medida, rutas de aventura en Guatemala y viajes internacionales optimizando cada quetzal que ahorraste en <strong class="text-zinc-200">tecHunter</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 shrink-0">
+          <a
+            id="cta-nova-viventia"
+            href="https://wa.me/50200000000?text={{ ('Hola Nova Viventia Travel, vengo desde tecHunter GT y quiero planear mi próximo viaje.') | urlencode }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/15 px-4 py-2.5 text-xs font-semibold text-amber-200 hover:bg-amber-400 hover:text-zinc-950 transition-colors"
+          >
+            Planear Viaje con Nova Viventia
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
   </main>
 
-  <footer class="border-t border-white/[0.07] bg-[#090B0E] py-6 mt-14">
+  <footer class="border-t border-white/[0.07] bg-[#090B0E] py-6 mt-12">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-2">
-      <span><strong class="text-zinc-300">tecHunter GT</strong> — Arquitectura Limpia &amp; Deduplicación Inteligente de Historial</span>
-      <span class="font-mono text-[11px]">Walmart · Paiz · Maxi Despensa · Kemik · Pacifiko · La Torre · Max · Cemaco</span>
+      <span><strong class="text-zinc-300">tecHunter GT</strong> · Ecosistema Corporativo (<span class="text-sky-300/90">Z-Tech Imports</span> &amp; <span class="text-amber-300/90">Nova Viventia Travel</span>)</span>
+      <span class="font-mono text-[11px]">Siman · Elektra · iShop · Walmart · Paiz · Maxi · Kemik · Pacifiko · La Torre · Max · Cemaco · PriceSmart</span>
     </div>
   </footer>
 
   <script>
-    // Atajo de teclado '/' para enfocar el buscador
+    const KEYWORDS_ZTECH = [
+      'laptop', 'notebook', 'workstation', 'computadora', 'pc', 'macbook',
+      'imac', 'mac mini', 'monitor', 'pantalla', 'rtx', 'gtx', 'radeon',
+      'gpu', 'procesador', 'ryzen', 'intel', 'ram', 'ssd', 'nvme',
+      'teclado', 'mouse', 'gamer', 'gaming', 'volante', 'g29', 'logitech',
+      'asus', 'lenovo', 'thinkpad', 'hp', 'dell', 'alienware', 'msi',
+      'acer', 'razer', 'servidor', 'nas', 'computo'
+    ];
+
+    function evaluarBannerZTechDinamico(valor) {
+      const banner = document.getElementById('ztech-imports-banner');
+      const label = document.getElementById('cta-ztech-label');
+      const cta = document.getElementById('cta-ztech-imports');
+      if (!banner) return;
+
+      const limpio = (valor || '').trim();
+      const lower = limpio.toLowerCase();
+      const coincide = !lower || KEYWORDS_ZTECH.some((kw) => lower.includes(kw));
+
+      if (coincide) {
+        banner.classList.remove('hidden');
+        const terminoCotizar = limpio || 'Workstation / Laptop';
+        if (label) {
+          label.textContent = `Cotizar "${terminoCotizar}" en Z-Tech`;
+        }
+        if (cta) {
+          const msg = `Hola Z-Tech Imports, vi en tecHunter la búsqueda de ${terminoCotizar} y deseo cotizar bajo pedido directo.`;
+          cta.href = `https://wa.me/50200000000?text=${encodeURIComponent(msg)}`;
+        }
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
     document.addEventListener('keydown', (e) => {
       if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
         e.preventDefault();
@@ -522,7 +695,7 @@
 
     async function escanearEnVivo() {
       const input = document.getElementById('search-input');
-      const query = (input.value || 'pedigree').trim();
+      const query = (input.value || 'samsung').trim();
       const btn = document.getElementById('btn-escanear-vivo');
       const label = document.getElementById('label-scan');
       const icon = document.getElementById('icon-scan');
@@ -533,7 +706,7 @@
       label.textContent = 'Escaneando...';
       toast.className = 'mt-4 rounded-xl border border-white/[0.12] bg-[#131822] px-4 py-3 text-sm text-zinc-200';
       toast.classList.remove('hidden');
-      toast.textContent = `Consultando Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko, La Torre, Max y Kemik para "${query}"...`;
+      toast.textContent = `Consultando Siman, Elektra, iShop, Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko, La Torre y Max para "${query}"...`;
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 35000);
@@ -567,7 +740,7 @@
         const nuevasOfertas = data.nuevas_ofertas ?? data.insertados_neon ?? 0;
         const descartados = data.descartados_ruido ?? 0;
         toast.className = 'mt-4 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200';
-        toast.textContent = `¡Escaneo completado! ${nuevasOfertas} nuevos cambios de precio guardados en Neon DB (${descartados} accesorios irrelevantes filtrados | Walmart/Paiz/Maxi: ${data.extraidos_walmart ?? 0}, Cemaco: ${data.extraidos_cemaco ?? 0}, Pacifiko: ${data.extraidos_pacifiko ?? 0}, La Torre: ${data.extraidos_la_torre ?? 0}). Recargando...`;
+        toast.textContent = `¡Escaneo completado! ${nuevasOfertas} nuevos cambios de precio guardados en Neon DB (${descartados} accesorios filtrados | Oficiales Siman/Elektra/iShop: ${data.extraidos_oficiales ?? 0}, Walmart/Paiz/Maxi: ${data.extraidos_walmart ?? 0}, Cemaco: ${data.extraidos_cemaco ?? 0}, Pacifiko: ${data.extraidos_pacifiko ?? 0}). Recargando...`;
 
         setTimeout(() => {
           window.location.href = `/?q=${encodeURIComponent(query)}`;
