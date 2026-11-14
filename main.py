@@ -1,9 +1,11 @@
 """
 Punto de entrada principal (Orquestador) de tecHunter / RadarOfertas.
-Coordina la ejecución concurrente de los scrapers locales:
+Coordina la ejecución concurrente de los 5 scrapers locales:
   - Kemik (kemik.gt)
   - Pacifiko (pacifiko.com)
   - Supermercados La Torre (latorre.com.gt)
+  - Tiendas Max / Tecno Fácil (max.com.gt / tecnofacil.com.gt)
+  - Cemaco (cemaco.com)
 Compara los precios en Quetzales (GTQ) y persiste de forma unificada en Neon DB
 respetando la arquitectura limpia (Clean Architecture).
 """
@@ -24,7 +26,9 @@ from radar_ofertas.domain.entities.oferta_local import OfertaLocal
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
+from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
+from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
 
@@ -56,6 +60,25 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
     )
     if any(p in q_lower for p in palabras_mascotas):
         return "mascotas"
+
+    palabras_hogar = (
+        "taladro",
+        "esmeriladora",
+        "herramienta",
+        "martillo",
+        "destornillador",
+        "truper",
+        "pretul",
+        "bosch",
+        "dewalt",
+        "stanley",
+        "lampara",
+        "ventilador",
+        "hogar",
+    )
+    if any(p in q_lower for p in palabras_hogar):
+        return "hogar"
+
     return "tecnologia"
 
 
@@ -63,19 +86,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Orquestador principal de tecHunter "
-            "(Kemik + Pacifiko + Supermercados La Torre -> Comparación + Neon DB)."
+            "(Kemik + Pacifiko + La Torre + Tiendas Max + Cemaco -> Comparación + Neon DB)."
         )
     )
     parser.add_argument(
         "query",
         nargs="?",
-        default="pedigree",
-        help="Término de búsqueda (ej. 'pedigree', 'purina', 'volante logitech')",
+        default="taladro",
+        help="Término de búsqueda (ej. 'taladro', 'galaxy watch', 'volante logitech', 'pedigree')",
     )
     parser.add_argument(
         "--categoria",
         default="",
-        help="Slug de la categoría en base de datos (se autodetecta 'mascotas' o 'tecnologia' si se omite)",
+        help="Slug de la categoría en base de datos (se autodetecta 'hogar', 'mascotas' o 'tecnologia' si se omite)",
     )
     parser.add_argument(
         "--limite",
@@ -86,12 +109,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--headed",
         action="store_true",
-        help="Abre navegador Chromium visible (headless=False) en Kemik para resolver Cloudflare en entorno local",
+        help="Abre navegador Chromium visible (headless=False) en Kemik/Max para resolver Cloudflare en entorno local",
     )
     parser.add_argument(
         "--simular",
         action="store_true",
-        help="Ejecuta La Torre y Pacifiko en vivo + respaldo JSON-LD de Kemik si Cloudflare bloquea IPs cloud",
+        help="Ejecuta Cemaco, Pacifiko y La Torre en vivo + respaldo de Kemik/Tiendas Max si Cloudflare bloquea IPs cloud",
     )
     parser.add_argument(
         "--sin-db",
@@ -134,12 +157,59 @@ PAYLOAD_SIMULADO_KEMIK = [
     },
 ]
 
+PAYLOAD_SIMULADO_MAX_GRAPHQL = [
+    {
+        "name": "Samsung Galaxy Watch 7 40mm Bluetooth Smartwatch Verde",
+        "sku": "SM-L300NZGAAXO",
+        "url_key": "samsung-galaxy-watch-7-40mm-bluetooth-smartwatch-verde",
+        "url_suffix": ".html",
+        "small_image": {
+            "url": "https://www.max.com.gt/media/catalog/product/s/m/sm-l300nzgaaxo_1.jpg"
+        },
+        "price_range": {
+            "minimum_price": {
+                "final_price": {"value": 2199.00, "currency": "GTQ"}
+            }
+        },
+    },
+    {
+        "name": "Samsung Galaxy Watch Ultra LTE 47mm Titanio Gris",
+        "sku": "SM-L705FDAAAXO",
+        "url_key": "samsung-galaxy-watch-ultra-lte-47mm-titanio-gris",
+        "url_suffix": ".html",
+        "small_image": {
+            "url": "https://www.max.com.gt/media/catalog/product/s/m/sm-l705fdaaaxo_1.jpg"
+        },
+        "price_range": {
+            "minimum_price": {
+                "final_price": {"value": 4999.00, "currency": "GTQ"}
+            }
+        },
+    },
+    {
+        "name": "Volante Logitech G29 Driving Force para PlayStation y PC",
+        "sku": "941-000110",
+        "url_key": "volante-logitech-g29-driving-force-playstation-pc",
+        "url_suffix": ".html",
+        "small_image": {
+            "url": "https://www.max.com.gt/media/catalog/product/9/4/941-000110_1.jpg"
+        },
+        "price_range": {
+            "minimum_price": {
+                "final_price": {"value": 2799.00, "currency": "GTQ"}
+            }
+        },
+    },
+]
+
 
 def mostrar_comparativa_en_consola(
     termino: str,
     ofertas_kemik: list[OfertaLocal],
     ofertas_pacifiko: list[OfertaLocal],
     ofertas_super: list[OfertaLocal],
+    ofertas_max: list[OfertaLocal],
+    ofertas_cemaco: list[OfertaLocal],
     limite: int,
 ) -> list[OfertaLocal]:
     """
@@ -147,19 +217,27 @@ def mostrar_comparativa_en_consola(
     y retorna la lista unificada ordenada.
     """
     todas_ordenadas = sorted(
-        [*ofertas_kemik, *ofertas_pacifiko, *ofertas_super],
+        [
+            *ofertas_kemik,
+            *ofertas_pacifiko,
+            *ofertas_super,
+            *ofertas_max,
+            *ofertas_cemaco,
+        ],
         key=lambda o: o.precio_gtq,
     )
 
-    print("\n" + "=" * 88)
+    print("\n" + "=" * 96)
     print(f" RADAR COMPARADOR TECHUNTER (GT) | Búsqueda: '{termino}'")
     print(
         f" Resumen por tienda: Kemik ({len(ofertas_kemik)}) | "
         f"Pacifiko ({len(ofertas_pacifiko)}) | "
         f"La Torre ({len(ofertas_super)}) | "
+        f"Tiendas Max ({len(ofertas_max)}) | "
+        f"Cemaco ({len(ofertas_cemaco)}) | "
         f"Total ({len(todas_ordenadas)})"
     )
-    print("=" * 88)
+    print("=" * 96)
 
     if not todas_ordenadas:
         print("No se encontraron ofertas en ninguna tienda.")
@@ -170,7 +248,7 @@ def mostrar_comparativa_en_consola(
         f"🏆 MEJOR PRECIO DETECTADO: Q{mejor_oferta.precio_gtq:,.2f} en [{mejor_oferta.tienda}] "
         f"-> {mejor_oferta.titulo}"
     )
-    print("=" * 88)
+    print("=" * 96)
 
     for i, oferta in enumerate(todas_ordenadas[:limite], 1):
         etiqueta = " ⭐ [MEJOR PRECIO]" if i == 1 else ""
@@ -178,7 +256,7 @@ def mostrar_comparativa_en_consola(
         print(f"    Precio : Q{oferta.precio_gtq:,.2f}")
         print(f"    URL    : {oferta.url}")
         print(f"    Imagen : {oferta.imagen_url}")
-        print("-" * 88)
+        print("-" * 96)
 
     return todas_ordenadas
 
@@ -219,16 +297,22 @@ async def ejecutar_orquestador() -> None:
     kemik_scraper = KemikScraper(headless=not args.headed)
     pacifiko_scraper = PacifikoScraper()
     super_scraper = SuperScraper()
+    max_scraper = MaxScraper(
+        headless=not args.headed, usar_playwright_fallback=not args.simular
+    )
+    cemaco_scraper = CemacoScraper()
 
     try:
         if args.simular:
             logger.info(
-                "Modo --simular activo: consultando La Torre y Pacifiko en vivo..."
+                "Modo --simular activo: consultando Cemaco, Pacifiko y La Torre en vivo..."
             )
-            ofertas_pacifiko, ofertas_super = await asyncio.gather(
+            ofertas_pacifiko, ofertas_super, ofertas_cemaco = await asyncio.gather(
                 pacifiko_scraper.buscar_producto(termino),
                 super_scraper.buscar_producto(termino),
+                cemaco_scraper.buscar_producto(termino),
             )
+            termino_lower = termino.lower()
             ofertas_kemik = (
                 [
                     oferta
@@ -236,18 +320,40 @@ async def ejecutar_orquestador() -> None:
                     if (oferta := kemik_scraper._mapear_producto_ld_a_oferta(item))
                     is not None
                 ]
-                if "logitech" in termino.lower() or "volante" in termino.lower()
+                if "logitech" in termino_lower or "volante" in termino_lower
                 else []
             )
+            items_max_filtrados = [
+                item
+                for item in PAYLOAD_SIMULADO_MAX_GRAPHQL
+                if any(tok in item["name"].lower() for tok in termino_lower.split())
+            ]
+            ofertas_max = max_scraper.parsear_respuesta_graphql(
+                {"data": {"products": {"items": items_max_filtrados}}}
+            )
         else:
-            ofertas_kemik, ofertas_pacifiko, ofertas_super = await asyncio.gather(
+            (
+                ofertas_kemik,
+                ofertas_pacifiko,
+                ofertas_super,
+                ofertas_max,
+                ofertas_cemaco,
+            ) = await asyncio.gather(
                 kemik_scraper.buscar_producto(termino),
                 pacifiko_scraper.buscar_producto(termino),
                 super_scraper.buscar_producto(termino),
+                max_scraper.buscar_producto(termino),
+                cemaco_scraper.buscar_producto(termino),
             )
 
         ofertas_unificadas = mostrar_comparativa_en_consola(
-            termino, ofertas_kemik, ofertas_pacifiko, ofertas_super, args.limite
+            termino,
+            ofertas_kemik,
+            ofertas_pacifiko,
+            ofertas_super,
+            ofertas_max,
+            ofertas_cemaco,
+            args.limite,
         )
 
         if not ofertas_unificadas:

@@ -150,6 +150,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "kemik": "https://www.kemik.gt",
             "pacifiko": "https://www.pacifiko.com",
             "la-torre": "https://www.latorre.com.gt",
+            "tiendas-max": "https://www.max.com.gt",
+            "tecnofacil": "https://www.tecnofacil.com.gt",
+            "cemaco": "https://www.cemaco.com",
         }
         url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
         cursor.execute(
@@ -199,6 +202,19 @@ class PostgresOfertaRepository(OfertaRepository):
             "Razer",
             "Sony",
             "Samsung",
+            "Apple",
+            "Nintendo",
+            "LG",
+            "Whirlpool",
+            "Mabe",
+            "Bosch",
+            "Truper",
+            "Pretul",
+            "Stanley",
+            "DeWalt",
+            "Makita",
+            "Black+Decker",
+            "Black & Decker",
         ]
         for marca in marcas_conocidas:
             if marca.lower() in titulo_lower:
@@ -343,7 +359,14 @@ class PostgresOfertaRepository(OfertaRepository):
         condiciones = ["p.activo = TRUE", "t.activo = TRUE"]
         params: list[Any] = []
 
-        if tienda_limpia in {"kemik", "pacifiko", "la-torre"}:
+        if tienda_limpia in {
+            "kemik",
+            "pacifiko",
+            "la-torre",
+            "tiendas-max",
+            "tecnofacil",
+            "cemaco",
+        }:
             condiciones.append("t.slug = %s")
             params.append(tienda_limpia)
 

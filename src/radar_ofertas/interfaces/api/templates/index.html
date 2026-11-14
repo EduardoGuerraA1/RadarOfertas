@@ -67,7 +67,7 @@
           Comparador de Precios en Guatemala
         </h1>
         <p class="mt-1.5 text-sm sm:text-base text-slate-600">
-          Consulta precios reales en Quetzales entre <strong class="font-semibold text-slate-800">Kemik</strong>, <strong class="font-semibold text-slate-800">Pacifiko</strong> y <strong class="font-semibold text-slate-800">Supermercados La Torre</strong> ordenados del más económico al más alto.
+          Consulta precios reales en Quetzales entre <strong class="font-semibold text-slate-800">Kemik</strong>, <strong class="font-semibold text-slate-800">Pacifiko</strong>, <strong class="font-semibold text-slate-800">La Torre</strong>, <strong class="font-semibold text-slate-800">Tiendas Max</strong> y <strong class="font-semibold text-slate-800">Cemaco</strong> ordenados del más económico al más alto.
         </p>
       </div>
 
@@ -88,7 +88,7 @@
             id="search-input"
             name="q"
             value="{{ query }}"
-            placeholder="Buscar en Neon DB (ej. pedigree, purina, volante logitech, g29)..."
+            placeholder="Buscar en Neon DB (ej. pedigree, taladro, galaxy watch, volante logitech)..."
             class="block w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/15 transition-all shadow-sm"
           />
         </div>
@@ -106,7 +106,7 @@
             type="button"
             id="btn-escanear-vivo"
             onclick="escanearEnVivo()"
-            title="Ejecuta los scrapers (Kemik, Pacifiko y La Torre) en vivo e inserta en Neon DB"
+            title="Ejecuta los scrapers (Kemik, Pacifiko, La Torre, Tiendas Max y Cemaco) en vivo e inserta en Neon DB"
             class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600/15 transition-colors"
           >
             <svg id="icon-scan" class="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -149,17 +149,31 @@
           >
             La Torre ({{ resumen.total_la_torre }})
           </a>
+          <a
+            href="/?q={{ query | urlencode }}&tienda=tiendas-max"
+            id="filter-tiendas-max"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if tienda_activa == 'tiendas-max' %}bg-orange-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-orange-50 hover:text-orange-800{% endif %}"
+          >
+            Tiendas Max ({{ resumen.total_tiendas_max }})
+          </a>
+          <a
+            href="/?q={{ query | urlencode }}&tienda=cemaco"
+            id="filter-cemaco"
+            class="px-3 py-1.5 rounded-lg font-medium transition-colors {% if tienda_activa == 'cemaco' %}bg-indigo-600 text-white{% else %}bg-white border border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-800{% endif %}"
+          >
+            Cemaco ({{ resumen.total_cemaco }})
+          </a>
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           <span>Búsquedas rápidas:</span>
           <a href="/?q=pedigree" class="underline hover:text-slate-900">pedigree</a>
           <span>·</span>
-          <a href="/?q=purina" class="underline hover:text-slate-900">purina</a>
+          <a href="/?q=taladro" class="underline hover:text-slate-900">taladro</a>
+          <span>·</span>
+          <a href="/?q=galaxy+watch" class="underline hover:text-slate-900">galaxy watch</a>
           <span>·</span>
           <a href="/?q=volante+logitech" class="underline hover:text-slate-900">volante logitech</a>
-          <span>·</span>
-          <a href="/?q=G29" class="underline hover:text-slate-900">G29</a>
           <span>·</span>
           <a href="/" class="underline hover:text-slate-900">Ver todo</a>
         </div>
@@ -212,8 +226,8 @@
           <span class="font-mono text-2xl font-bold text-slate-900 tabular-nums">
             {{ resumen.total }}
           </span>
-          <span class="text-xs text-slate-500">
-            ({{ resumen.total_kemik }} Kemik · {{ resumen.total_pacifiko }} Pacifiko · {{ resumen.total_la_torre }} La Torre)
+          <span class="text-xs text-slate-500 truncate">
+            ({{ resumen.total_kemik }} Kemik · {{ resumen.total_pacifiko }} Pacifiko · {{ resumen.total_la_torre }} La Torre · {{ resumen.total_tiendas_max }} Max · {{ resumen.total_cemaco }} Cemaco)
           </span>
         </div>
         <p class="mt-1 text-xs text-slate-500">
@@ -278,6 +292,14 @@
               {% elif oferta.tienda_slug == 'la-torre' %}
               <span class="inline-flex items-center rounded-md bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 border border-teal-200/80">
                 La Torre
+              </span>
+              {% elif oferta.tienda_slug in ['tiendas-max', 'tecnofacil'] %}
+              <span class="inline-flex items-center rounded-md bg-orange-50 px-2 py-0.5 text-xs font-semibold text-orange-800 border border-orange-200/80">
+                {{ oferta.tienda }}
+              </span>
+              {% elif oferta.tienda_slug == 'cemaco' %}
+              <span class="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-800 border border-indigo-200/80">
+                Cemaco
               </span>
               {% else %}
               <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
@@ -371,7 +393,7 @@
   <footer class="border-t border-slate-200/80 bg-white py-6 mt-12">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
       <span><strong>tecHunter</strong> — Plataforma de Comparación de Precios en Guatemala (Clean Architecture)</span>
-      <span class="font-mono">Tiendas activas: Kemik · Pacifiko · La Torre | DB: Neon PostgreSQL</span>
+      <span class="font-mono">Tiendas activas: Kemik · Pacifiko · La Torre · Tiendas Max · Cemaco | DB: Neon PostgreSQL</span>
     </div>
   </footer>
 
@@ -387,26 +409,53 @@
       btn.disabled = true;
       icon.classList.add('animate-spin');
       label.textContent = 'Escaneando...';
+      toast.className = 'mt-4 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-900';
       toast.classList.remove('hidden');
-      toast.textContent = `Consultando Kemik, Pacifiko y La Torre en vivo para "${query}" e inyectando en Neon DB...`;
+      toast.textContent = `Consultando Kemik, Pacifiko, La Torre, Tiendas Max y Cemaco en vivo para "${query}" e inyectando en Neon DB...`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       try {
         const resp = await fetch('/api/escanear', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
           body: JSON.stringify({ query }),
+          signal: controller.signal,
         });
-        const data = await resp.json();
-        if (!resp.ok) {
-          throw new Error(data.detail || 'Error durante el escaneo');
+        clearTimeout(timeoutId);
+
+        const rawText = await resp.text();
+        let data = null;
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch (_parseErr) {
+          throw new Error(
+            'El servidor tardó demasiado o devolvió una respuesta temporal no válida. Intenta de nuevo en unos segundos.'
+          );
         }
-        toast.textContent = `¡Listo! Se extrajeron ${data.extraidos_kemik} de Kemik, ${data.extraidos_pacifiko} de Pacifiko y ${data.extraidos_la_torre} de La Torre (${data.insertados_neon} guardados en Neon DB). Recargando...`;
+
+        if (!resp.ok || data.status === 'error') {
+          throw new Error(data.detail || 'Error controlado durante el escaneo de tiendas.');
+        }
+
+        const nuevasOfertas = data.nuevas_ofertas ?? data.insertados_neon ?? 0;
+        toast.className = 'mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900';
+        toast.textContent = `¡Escaneo completado (${data.status})! ${nuevasOfertas} ofertas guardadas en Neon DB (Kemik: ${data.extraidos_kemik ?? 0}, Pacifiko: ${data.extraidos_pacifiko ?? 0}, La Torre: ${data.extraidos_la_torre ?? 0}, Max: ${data.extraidos_tiendas_max ?? 0}, Cemaco: ${data.extraidos_cemaco ?? 0}). Recargando...`;
+
         setTimeout(() => {
           window.location.href = `/?q=${encodeURIComponent(query)}`;
         }, 900);
       } catch (err) {
+        clearTimeout(timeoutId);
         toast.className = 'mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800';
-        toast.textContent = `Error al escanear: ${err.message}`;
+        const msg = err.name === 'AbortError'
+          ? 'El escaneo superó el tiempo límite de espera (35s). Recarga la página para ver las ofertas procesadas.'
+          : err.message;
+        toast.textContent = `Aviso al escanear: ${msg}`;
         btn.disabled = false;
         icon.classList.remove('animate-spin');
         label.textContent = 'Escanear Tiendas';

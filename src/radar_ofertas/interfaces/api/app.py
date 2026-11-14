@@ -13,14 +13,17 @@ from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from radar_ofertas.domain.entities.oferta_local import OfertaLocal
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
+from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
+from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
 
@@ -33,16 +36,16 @@ app = FastAPI(
     title="tecHunter — Comparador de Precios en Guatemala",
     description=(
         "Plataforma de comparación de precios en tiempo real "
-        "(Kemik, Pacifiko y Supermercados La Torre) respaldada por Neon DB."
+        "(Kemik, Pacifiko, Supermercados La Torre, Tiendas Max y Cemaco) respaldada por Neon DB."
     ),
-    version="1.1.0",
+    version="1.2.0",
 )
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 class EscanearRequest(BaseModel):
-    query: str
+    query: str = ""
     categoria: str = ""
 
 
@@ -64,6 +67,25 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
     )
     if any(p in q_lower for p in palabras_mascotas):
         return "mascotas"
+
+    palabras_hogar = (
+        "taladro",
+        "esmeriladora",
+        "herramienta",
+        "martillo",
+        "destornillador",
+        "truper",
+        "pretul",
+        "bosch",
+        "dewalt",
+        "stanley",
+        "lampara",
+        "ventilador",
+        "hogar",
+    )
+    if any(p in q_lower for p in palabras_hogar):
+        return "hogar"
+
     return "tecnologia"
 
 
@@ -74,6 +96,8 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             "total_kemik": 0,
             "total_pacifiko": 0,
             "total_la_torre": 0,
+            "total_tiendas_max": 0,
+            "total_cemaco": 0,
             "mejor_oferta": None,
             "ahorro_maximo_gtq": 0.0,
         }
@@ -87,9 +111,35 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
         "total_kemik": sum(1 for o in ofertas if o["tienda_slug"] == "kemik"),
         "total_pacifiko": sum(1 for o in ofertas if o["tienda_slug"] == "pacifiko"),
         "total_la_torre": sum(1 for o in ofertas if o["tienda_slug"] == "la-torre"),
+        "total_tiendas_max": sum(
+            1 for o in ofertas if o["tienda_slug"] in {"tiendas-max", "tecnofacil"}
+        ),
+        "total_cemaco": sum(1 for o in ofertas if o["tienda_slug"] == "cemaco"),
         "mejor_oferta": mejor,
         "ahorro_maximo_gtq": round(ahorro, 2),
     }
+
+
+async def _ejecutar_scraper_seguro(
+    scraper: Any, nombre_tienda: str, termino: str, timeout_s: float = 12.0
+) -> tuple[list[OfertaLocal], str | None]:
+    """
+    Ejecuta un scraper con timeout estricto y captura cualquier excepción
+    para garantizar que un fallo o bloqueo nunca rompa el endpoint JSON.
+    """
+    try:
+        ofertas = await asyncio.wait_for(
+            scraper.buscar_producto(termino), timeout=timeout_s
+        )
+        return list(ofertas or []), None
+    except asyncio.TimeoutError:
+        msg = f"{nombre_tienda}: tiempo de espera agotado ({timeout_s:.0f}s)"
+        logger.warning(msg)
+        return [], msg
+    except Exception as error:
+        msg = f"{nombre_tienda}: {error.__class__.__name__}"
+        logger.warning("Fallo controlado en scraper %s: %s", nombre_tienda, error)
+        return [], msg
 
 
 @app.get("/health")
@@ -103,7 +153,8 @@ async def vista_comparador(
     request: Request,
     q: str = Query(default="", description="Término de búsqueda en Neon DB"),
     tienda: str = Query(
-        default="", description="Filtro por tienda: kemik, pacifiko o la-torre"
+        default="",
+        description="Filtro por tienda: kemik, pacifiko, la-torre, tiendas-max o cemaco",
     ),
 ) -> HTMLResponse:
     error_db: str | None = None
@@ -155,41 +206,108 @@ async def api_listar_ofertas(
 
 
 @app.post("/api/escanear")
-async def api_escanear_en_vivo(payload: EscanearRequest) -> dict[str, Any]:
-    termino = payload.query.strip()
-    if not termino:
-        raise HTTPException(
-            status_code=400, detail="Debes indicar un término de búsqueda."
+async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
+    """
+    Ejecuta todos los scrapers en paralelo con aislamiento de fallos y timeouts
+    individuales. Devuelve SIEMPRE un JSON estructurado (`status`, `nuevas_ofertas`)
+    para que el frontend nunca sufra errores de parseo ('Unexpected token...').
+    """
+    try:
+        termino = (payload.query or "").strip()
+        if not termino:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "status": "error",
+                    "nuevas_ofertas": 0,
+                    "detail": "Debes indicar un término de búsqueda.",
+                },
+            )
+
+        categoria = _detectar_categoria_por_query(termino, payload.categoria)
+
+        kemik_scraper = KemikScraper(headless=True)
+        pacifiko_scraper = PacifikoScraper()
+        super_scraper = SuperScraper()
+        max_scraper = MaxScraper(
+            headless=True, timeout_s=8, usar_playwright_fallback=False
+        )
+        cemaco_scraper = CemacoScraper(timeout_s=10)
+
+        resultados = await asyncio.gather(
+            _ejecutar_scraper_seguro(kemik_scraper, "Kemik", termino, timeout_s=8.0),
+            _ejecutar_scraper_seguro(
+                pacifiko_scraper, "Pacifiko", termino, timeout_s=12.0
+            ),
+            _ejecutar_scraper_seguro(
+                super_scraper, "La Torre", termino, timeout_s=12.0
+            ),
+            _ejecutar_scraper_seguro(
+                max_scraper, "Tiendas Max", termino, timeout_s=8.0
+            ),
+            _ejecutar_scraper_seguro(cemaco_scraper, "Cemaco", termino, timeout_s=12.0),
         )
 
-    categoria = _detectar_categoria_por_query(termino, payload.categoria)
+        (ofertas_kemik, err_kemik) = resultados[0]
+        (ofertas_pacifiko, err_pacifiko) = resultados[1]
+        (ofertas_super, err_super) = resultados[2]
+        (ofertas_max, err_max) = resultados[3]
+        (ofertas_cemaco, err_cemaco) = resultados[4]
 
-    kemik_scraper = KemikScraper(headless=True)
-    pacifiko_scraper = PacifikoScraper()
-    super_scraper = SuperScraper()
+        advertencias = [
+            err
+            for err in (err_kemik, err_pacifiko, err_super, err_max, err_cemaco)
+            if err is not None
+        ]
 
-    ofertas_kemik, ofertas_pacifiko, ofertas_super = await asyncio.gather(
-        kemik_scraper.buscar_producto(termino),
-        pacifiko_scraper.buscar_producto(termino),
-        super_scraper.buscar_producto(termino),
-    )
-    unificadas = [*ofertas_kemik, *ofertas_pacifiko, *ofertas_super]
+        unificadas = [
+            *ofertas_kemik,
+            *ofertas_pacifiko,
+            *ofertas_super,
+            *ofertas_max,
+            *ofertas_cemaco,
+        ]
 
-    insertados = 0
-    if unificadas:
-        repositorio = PostgresOfertaRepository()
-        insertados = await asyncio.to_thread(
-            repositorio.guardar_ofertas, unificadas, categoria
+        insertados = 0
+        error_db: str | None = None
+        if unificadas:
+            try:
+                repositorio = PostgresOfertaRepository()
+                insertados = await asyncio.to_thread(
+                    repositorio.guardar_ofertas, unificadas, categoria
+                )
+            except Exception as db_exc:
+                logger.error("Error guardando ofertas en Neon DB: %s", db_exc)
+                error_db = str(db_exc)
+                advertencias.append(f"Neon DB: {error_db}")
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "success" if error_db is None else "partial",
+                "nuevas_ofertas": insertados,
+                "query": termino,
+                "categoria": categoria,
+                "extraidos_kemik": len(ofertas_kemik),
+                "extraidos_pacifiko": len(ofertas_pacifiko),
+                "extraidos_la_torre": len(ofertas_super),
+                "extraidos_tiendas_max": len(ofertas_max),
+                "extraidos_cemaco": len(ofertas_cemaco),
+                "insertados_neon": insertados,
+                "advertencias": advertencias,
+            },
         )
-
-    return {
-        "query": termino,
-        "categoria": categoria,
-        "extraidos_kemik": len(ofertas_kemik),
-        "extraidos_pacifiko": len(ofertas_pacifiko),
-        "extraidos_la_torre": len(ofertas_super),
-        "insertados_neon": insertados,
-    }
+    except Exception as unexpected_error:
+        logger.exception("Error inesperado en POST /api/escanear: %s", unexpected_error)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "error",
+                "nuevas_ofertas": 0,
+                "insertados_neon": 0,
+                "detail": f"Error controlado en el servidor: {unexpected_error}",
+            },
+        )
 
 
 if __name__ == "__main__":
