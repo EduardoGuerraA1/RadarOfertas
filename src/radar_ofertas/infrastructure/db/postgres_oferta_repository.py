@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
 from radar_ofertas.domain.repositories.oferta_repository import OfertaRepository
+from radar_ofertas.domain.services.filtro_relevancia import filtrar_dicts_relevantes
 
 load_dotenv()
 
@@ -153,6 +154,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "tiendas-max": "https://www.max.com.gt",
             "tecnofacil": "https://www.tecnofacil.com.gt",
             "cemaco": "https://www.cemaco.com",
+            "walmart": "https://www.walmart.com.gt",
+            "paiz": "https://www.paiz.com.gt",
+            "maxi-despensa": "https://www.maxidespensa.com.gt",
         }
         url_base = urls_conocidas.get(slug, f"https://www.{slug}.com")
         cursor.execute(
@@ -215,10 +219,15 @@ class PostgresOfertaRepository(OfertaRepository):
             "Makita",
             "Black+Decker",
             "Black & Decker",
+            "Black And Decker",
+            "Emtop",
+            "Xiaomi",
+            "Garmin",
+            "JBL",
         ]
         for marca in marcas_conocidas:
             if marca.lower() in titulo_lower:
-                return marca
+                return "Black+Decker" if "black" in marca.lower() else marca
         return None
 
     @classmethod
@@ -280,13 +289,42 @@ class PostgresOfertaRepository(OfertaRepository):
         nuevo = cursor.fetchone()
         return str(nuevo[0])
 
+    @staticmethod
+    def _obtener_ultimo_precio_registrado(
+        cursor, producto_id: str, tienda_id: str
+    ) -> Decimal | None:
+        """
+        Consulta el último `precio_nativo` registrado en `historial_precios`
+        para la combinación `(producto_id, tienda_id)`.
+        """
+        cursor.execute(
+            """
+            SELECT precio_nativo
+            FROM historial_precios
+            WHERE producto_id = %s AND tienda_id = %s
+            ORDER BY scraped_at DESC
+            LIMIT 1;
+            """,
+            (producto_id, tienda_id),
+        )
+        fila = cursor.fetchone()
+        if not fila or fila[0] is None:
+            return None
+        return Decimal(str(fila[0])).quantize(Decimal("0.01"))
+
     def guardar_ofertas(
         self, ofertas: list[OfertaLocal], categoria_slug: str = "tecnologia"
     ) -> int:
+        """
+        Persiste productos en `productos` e inserta un nuevo registro en
+        `historial_precios` ÚNICAMENTE si el precio actual cambió respecto al
+        último precio registrado para esa tienda y producto (optimización de espacio en DB).
+        """
         if not ofertas:
             return 0
 
         insertados = 0
+        omitidos_sin_cambio = 0
         conn = self._get_connection()
         try:
             with conn:
@@ -307,7 +345,17 @@ class PostgresOfertaRepository(OfertaRepository):
                             cursor, oferta, categoria_id
                         )
 
-                        precio_nativo = Decimal(str(oferta.precio_gtq))
+                        precio_nativo = Decimal(str(oferta.precio_gtq)).quantize(
+                            Decimal("0.01")
+                        )
+
+                        ultimo_precio = self._obtener_ultimo_precio_registrado(
+                            cursor, producto_id, tienda_id
+                        )
+                        if ultimo_precio is not None and ultimo_precio == precio_nativo:
+                            omitidos_sin_cambio += 1
+                            continue
+
                         costo_envio = Decimal("0.00") if envio_gratis else tarifa_envio
                         costo_real_gtq = precio_nativo + costo_envio
 
@@ -339,8 +387,9 @@ class PostgresOfertaRepository(OfertaRepository):
                         insertados += 1
 
             logger.info(
-                "Neon DB: Se guardaron exitosamente %d ofertas en `productos` e `historial_precios`.",
+                "Neon DB: %d nuevos precios insertados en `historial_precios` (%d omitidos sin variación de precio).",
                 insertados,
+                omitidos_sin_cambio,
             )
             return insertados
         finally:
@@ -351,7 +400,8 @@ class PostgresOfertaRepository(OfertaRepository):
     ) -> list[dict[str, Any]]:
         """
         Obtiene la última oferta por (producto, tienda) desde Neon DB,
-        filtrando por palabras clave y tienda opcional, ordenadas por precio ascendente.
+        filtrando por palabras clave, tienda opcional y el Filtro Inteligente Anti-Ruido,
+        ordenadas por precio ascendente.
         """
         tokens = [t.strip() for t in query.strip().split() if t.strip()]
         tienda_limpia = tienda_slug.strip().lower()
@@ -366,6 +416,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "tiendas-max",
             "tecnofacil",
             "cemaco",
+            "walmart",
+            "paiz",
+            "maxi-despensa",
         }:
             condiciones.append("t.slug = %s")
             params.append(tienda_limpia)
@@ -427,4 +480,4 @@ class PostgresOfertaRepository(OfertaRepository):
                     "scraped_at": str(fila[10]),
                 }
             )
-        return resultados
+        return filtrar_dicts_relevantes(resultados, query)

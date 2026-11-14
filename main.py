@@ -1,13 +1,14 @@
 """
 Punto de entrada principal (Orquestador) de tecHunter / RadarOfertas.
-Coordina la ejecución concurrente de los 5 scrapers locales:
+Coordina la ejecución concurrente de los scrapers locales en Guatemala:
   - Kemik (kemik.gt)
   - Pacifiko (pacifiko.com)
   - Supermercados La Torre (latorre.com.gt)
   - Tiendas Max / Tecno Fácil (max.com.gt / tecnofacil.com.gt)
   - Cemaco (cemaco.com)
-Compara los precios en Quetzales (GTQ) y persiste de forma unificada en Neon DB
-respetando la arquitectura limpia (Clean Architecture).
+  - Grupo Walmart (walmart.com.gt, paiz.com.gt y maxidespensa.com.gt)
+Aplica el Filtro Inteligente Anti-Ruido, compara precios en Quetzales (GTQ)
+y persiste de forma optimizada (solo cambios de precio) en Neon DB.
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from dotenv import load_dotenv
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import filtrar_ofertas_relevantes
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
@@ -31,6 +33,7 @@ from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
+from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 load_dotenv()
 
@@ -86,14 +89,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Orquestador principal de tecHunter "
-            "(Kemik + Pacifiko + La Torre + Tiendas Max + Cemaco -> Comparación + Neon DB)."
+            "(Kemik + Pacifiko + La Torre + Tiendas Max + Cemaco + Grupo Walmart -> Anti-Ruido + Neon DB)."
         )
     )
     parser.add_argument(
         "query",
         nargs="?",
-        default="taladro",
-        help="Término de búsqueda (ej. 'taladro', 'galaxy watch', 'volante logitech', 'pedigree')",
+        default="pedigree",
+        help="Término de búsqueda (ej. 'pedigree', 'taladro', 'galaxy watch', 'volante logitech')",
     )
     parser.add_argument(
         "--categoria",
@@ -114,7 +117,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--simular",
         action="store_true",
-        help="Ejecuta Cemaco, Pacifiko y La Torre en vivo + respaldo de Kemik/Tiendas Max si Cloudflare bloquea IPs cloud",
+        help="Ejecuta Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko y La Torre en vivo + respaldo de Kemik/Tiendas Max",
     )
     parser.add_argument(
         "--sin-db",
@@ -210,37 +213,40 @@ def mostrar_comparativa_en_consola(
     ofertas_super: list[OfertaLocal],
     ofertas_max: list[OfertaLocal],
     ofertas_cemaco: list[OfertaLocal],
+    ofertas_walmart_grupo: list[OfertaLocal],
     limite: int,
 ) -> list[OfertaLocal]:
     """
-    Ordena y muestra las ofertas de todas las tiendas de menor a mayor precio
-    y retorna la lista unificada ordenada.
+    Aplica el Filtro Inteligente Anti-Ruido, ordena y muestra las ofertas de todas
+    las tiendas de menor a mayor precio y retorna la lista unificada relevante.
     """
-    todas_ordenadas = sorted(
-        [
-            *ofertas_kemik,
-            *ofertas_pacifiko,
-            *ofertas_super,
-            *ofertas_max,
-            *ofertas_cemaco,
-        ],
-        key=lambda o: o.precio_gtq,
-    )
+    brutas = [
+        *ofertas_kemik,
+        *ofertas_pacifiko,
+        *ofertas_super,
+        *ofertas_max,
+        *ofertas_cemaco,
+        *ofertas_walmart_grupo,
+    ]
+    relevantes = filtrar_ofertas_relevantes(brutas, termino)
+    todas_ordenadas = sorted(relevantes, key=lambda o: o.precio_gtq)
 
     print("\n" + "=" * 96)
     print(f" RADAR COMPARADOR TECHUNTER (GT) | Búsqueda: '{termino}'")
     print(
-        f" Resumen por tienda: Kemik ({len(ofertas_kemik)}) | "
-        f"Pacifiko ({len(ofertas_pacifiko)}) | "
-        f"La Torre ({len(ofertas_super)}) | "
-        f"Tiendas Max ({len(ofertas_max)}) | "
-        f"Cemaco ({len(ofertas_cemaco)}) | "
-        f"Total ({len(todas_ordenadas)})"
+        f" Resumen (tras Filtro Anti-Ruido): "
+        f"Kemik ({sum(1 for o in todas_ordenadas if o.tienda == 'Kemik')}) | "
+        f"Pacifiko ({sum(1 for o in todas_ordenadas if o.tienda == 'Pacifiko')}) | "
+        f"La Torre ({sum(1 for o in todas_ordenadas if o.tienda == 'La Torre')}) | "
+        f"Max ({sum(1 for o in todas_ordenadas if o.tienda == 'Tiendas Max')}) | "
+        f"Cemaco ({sum(1 for o in todas_ordenadas if o.tienda == 'Cemaco')}) | "
+        f"Walmart/Paiz/Maxi ({sum(1 for o in todas_ordenadas if o.tienda in {'Walmart', 'Paiz', 'Maxi Despensa'})}) | "
+        f"Total ({len(todas_ordenadas)} de {len(brutas)} brutas)"
     )
     print("=" * 96)
 
     if not todas_ordenadas:
-        print("No se encontraron ofertas en ninguna tienda.")
+        print("No se encontraron ofertas principales en ninguna tienda.")
         return []
 
     mejor_oferta = todas_ordenadas[0]
@@ -272,15 +278,15 @@ def guardar_en_base_de_datos(
         return
 
     logger.info(
-        "Conectando a Neon DB para registrar %d ofertas unificadas (categoría='%s')...",
+        "Conectando a Neon DB para sincronizar %d ofertas filtradas (categoría='%s')...",
         len(ofertas),
         categoria_slug,
     )
     repositorio = PostgresOfertaRepository(database_url=database_url)
     insertados = repositorio.guardar_ofertas(ofertas, categoria_slug=categoria_slug)
     print(
-        f"\n✅ Base de Datos (Neon): Se inyectaron {insertados} ofertas unificadas en "
-        f"`productos` e `historial_precios` (categoría: {categoria_slug})."
+        f"\n✅ Base de Datos (Neon): {insertados} nuevos cambios de precio registrados en "
+        f"`historial_precios` (de {len(ofertas)} productos evaluados, categoría: {categoria_slug})."
     )
 
 
@@ -301,16 +307,23 @@ async def ejecutar_orquestador() -> None:
         headless=not args.headed, usar_playwright_fallback=not args.simular
     )
     cemaco_scraper = CemacoScraper()
+    walmart_scraper = WalmartScraper()
 
     try:
         if args.simular:
             logger.info(
-                "Modo --simular activo: consultando Cemaco, Pacifiko y La Torre en vivo..."
+                "Modo --simular activo: consultando Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko y La Torre en vivo..."
             )
-            ofertas_pacifiko, ofertas_super, ofertas_cemaco = await asyncio.gather(
+            (
+                ofertas_pacifiko,
+                ofertas_super,
+                ofertas_cemaco,
+                ofertas_walmart_grupo,
+            ) = await asyncio.gather(
                 pacifiko_scraper.buscar_producto(termino),
                 super_scraper.buscar_producto(termino),
                 cemaco_scraper.buscar_producto(termino),
+                walmart_scraper.buscar_producto(termino),
             )
             termino_lower = termino.lower()
             ofertas_kemik = (
@@ -338,12 +351,14 @@ async def ejecutar_orquestador() -> None:
                 ofertas_super,
                 ofertas_max,
                 ofertas_cemaco,
+                ofertas_walmart_grupo,
             ) = await asyncio.gather(
                 kemik_scraper.buscar_producto(termino),
                 pacifiko_scraper.buscar_producto(termino),
                 super_scraper.buscar_producto(termino),
                 max_scraper.buscar_producto(termino),
                 cemaco_scraper.buscar_producto(termino),
+                walmart_scraper.buscar_producto(termino),
             )
 
         ofertas_unificadas = mostrar_comparativa_en_consola(
@@ -353,12 +368,13 @@ async def ejecutar_orquestador() -> None:
             ofertas_super,
             ofertas_max,
             ofertas_cemaco,
+            ofertas_walmart_grupo,
             args.limite,
         )
 
         if not ofertas_unificadas:
             print(
-                f"\n⚠️ No se encontraron ofertas para '{termino}' en ninguna tienda.\n"
+                f"\n⚠️ No se encontraron ofertas principales para '{termino}' en ninguna tienda.\n"
                 f'💡 Prueba ejecutando: python main.py "{termino}" --headed'
             )
             return

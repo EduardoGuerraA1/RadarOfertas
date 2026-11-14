@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import filtrar_ofertas_relevantes
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
@@ -26,6 +27,7 @@ from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
+from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 logger = logging.getLogger("tecHunter.api")
 
@@ -36,9 +38,10 @@ app = FastAPI(
     title="tecHunter — Comparador de Precios en Guatemala",
     description=(
         "Plataforma de comparación de precios en tiempo real "
-        "(Kemik, Pacifiko, Supermercados La Torre, Tiendas Max y Cemaco) respaldada por Neon DB."
+        "(Kemik, Pacifiko, La Torre, Tiendas Max, Cemaco, Walmart, Paiz y Maxi Despensa) "
+        "respaldada por Neon DB."
     ),
-    version="1.2.0",
+    version="2.0.0",
 )
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -98,6 +101,9 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             "total_la_torre": 0,
             "total_tiendas_max": 0,
             "total_cemaco": 0,
+            "total_walmart": 0,
+            "total_paiz": 0,
+            "total_maxi_despensa": 0,
             "mejor_oferta": None,
             "ahorro_maximo_gtq": 0.0,
         }
@@ -115,6 +121,11 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             1 for o in ofertas if o["tienda_slug"] in {"tiendas-max", "tecnofacil"}
         ),
         "total_cemaco": sum(1 for o in ofertas if o["tienda_slug"] == "cemaco"),
+        "total_walmart": sum(1 for o in ofertas if o["tienda_slug"] == "walmart"),
+        "total_paiz": sum(1 for o in ofertas if o["tienda_slug"] == "paiz"),
+        "total_maxi_despensa": sum(
+            1 for o in ofertas if o["tienda_slug"] == "maxi-despensa"
+        ),
         "mejor_oferta": mejor,
         "ahorro_maximo_gtq": round(ahorro, 2),
     }
@@ -154,7 +165,7 @@ async def vista_comparador(
     q: str = Query(default="", description="Término de búsqueda en Neon DB"),
     tienda: str = Query(
         default="",
-        description="Filtro por tienda: kemik, pacifiko, la-torre, tiendas-max o cemaco",
+        description="Filtro por tienda: kemik, pacifiko, la-torre, tiendas-max, cemaco, walmart, paiz o maxi-despensa",
     ),
 ) -> HTMLResponse:
     error_db: str | None = None
@@ -208,9 +219,9 @@ async def api_listar_ofertas(
 @app.post("/api/escanear")
 async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
     """
-    Ejecuta todos los scrapers en paralelo con aislamiento de fallos y timeouts
-    individuales. Devuelve SIEMPRE un JSON estructurado (`status`, `nuevas_ofertas`)
-    para que el frontend nunca sufra errores de parseo ('Unexpected token...').
+    Ejecuta todos los scrapers en paralelo con aislamiento de fallos, timeouts
+    individuales y Filtro Inteligente Anti-Ruido. Devuelve SIEMPRE un JSON
+    estructurado (`status`, `nuevas_ofertas`) para evitar errores de parseo.
     """
     try:
         termino = (payload.query or "").strip()
@@ -233,6 +244,7 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
             headless=True, timeout_s=8, usar_playwright_fallback=False
         )
         cemaco_scraper = CemacoScraper(timeout_s=10)
+        walmart_scraper = WalmartScraper(timeout_s=10)
 
         resultados = await asyncio.gather(
             _ejecutar_scraper_seguro(kemik_scraper, "Kemik", termino, timeout_s=8.0),
@@ -246,6 +258,9 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
                 max_scraper, "Tiendas Max", termino, timeout_s=8.0
             ),
             _ejecutar_scraper_seguro(cemaco_scraper, "Cemaco", termino, timeout_s=12.0),
+            _ejecutar_scraper_seguro(
+                walmart_scraper, "Grupo Walmart", termino, timeout_s=14.0
+            ),
         )
 
         (ofertas_kemik, err_kemik) = resultados[0]
@@ -253,20 +268,31 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         (ofertas_super, err_super) = resultados[2]
         (ofertas_max, err_max) = resultados[3]
         (ofertas_cemaco, err_cemaco) = resultados[4]
+        (ofertas_walmart, err_walmart) = resultados[5]
 
         advertencias = [
             err
-            for err in (err_kemik, err_pacifiko, err_super, err_max, err_cemaco)
+            for err in (
+                err_kemik,
+                err_pacifiko,
+                err_super,
+                err_max,
+                err_cemaco,
+                err_walmart,
+            )
             if err is not None
         ]
 
-        unificadas = [
+        unificadas_brutas = [
             *ofertas_kemik,
             *ofertas_pacifiko,
             *ofertas_super,
             *ofertas_max,
             *ofertas_cemaco,
+            *ofertas_walmart,
         ]
+        unificadas = filtrar_ofertas_relevantes(unificadas_brutas, termino)
+        descartados_ruido = len(unificadas_brutas) - len(unificadas)
 
         insertados = 0
         error_db: str | None = None
@@ -286,6 +312,8 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
             content={
                 "status": "success" if error_db is None else "partial",
                 "nuevas_ofertas": insertados,
+                "evaluados_relevantes": len(unificadas),
+                "descartados_ruido": descartados_ruido,
                 "query": termino,
                 "categoria": categoria,
                 "extraidos_kemik": len(ofertas_kemik),
@@ -293,6 +321,7 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
                 "extraidos_la_torre": len(ofertas_super),
                 "extraidos_tiendas_max": len(ofertas_max),
                 "extraidos_cemaco": len(ofertas_cemaco),
+                "extraidos_walmart": len(ofertas_walmart),
                 "insertados_neon": insertados,
                 "advertencias": advertencias,
             },
