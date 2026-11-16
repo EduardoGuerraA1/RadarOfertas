@@ -4,6 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>tecHunter GT v5.0 — El mejor precio. Ya calculado con envío.</title>
+  {% if ga_measurement_id %}
+  <!-- Google Analytics 4 (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '{{ ga_measurement_id }}');
+  </script>
+  {% endif %}
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -87,15 +97,12 @@
           <span>{{ resumen.total }} productos</span>
         </div>
         <a
-          href="/api/seed-status"
+          href="/api/analytics/summary"
           target="_blank"
-          title="Ver estado del Background Worker y Matriz Semilla"
-          class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-xs font-medium text-emerald-800 hover:bg-emerald-100/80 transition-colors"
+          title="Ver telemetría de visitas, búsquedas populares y clics salientes"
+          class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-xs font-medium text-emerald-800 hover:bg-emerald-100/80 transition-colors tabular-nums"
         >
-          <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span>Worker Auto-Sync</span>
+          <span>📊 {{ visitas_totales | default(1) }} visitas</span>
         </a>
       </div>
     </div>
@@ -237,7 +244,7 @@
           <p class="text-xs sm:text-sm text-gray-500 mt-0.5 tabular-nums">
             {{ ofertas | length }} ofertas · ordenadas por {% if orden_activo == 'base' %}precio de lista{% else %}precio final con envío{% endif %}
             {% if resumen.ahorro_maximo_gtq > 0 %}
-              · <span class="text-emerald-600 font-medium">Ahorro detectado hasta Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</span>
+              · <span class="text-emerald-600 font-medium">Ahorro verificado en el mismo producto: Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</span>
             {% endif %}
           </p>
         </div>
@@ -368,6 +375,7 @@
           href="https://ztechgt.com"
           target="_blank"
           rel="noopener noreferrer"
+          onclick="techunterTrack('house_ad_click', 'Z-Tech Imports GT', 'Cotización Computo', 'https://ztechgt.com', 0)"
           class="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
         >
           <span>Cotizar en ztechgt.com</span>
@@ -381,6 +389,7 @@
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {% for oferta in ofertas %}
         {% set es_mejor_precio = (loop.index == 1) %}
+        {% set ahorro_item = oferta.ahorro_gtq | default(0.0) %}
         {% set dot_tienda = {
           'istore': 'bg-gray-900',
           'ishop': 'bg-gray-900',
@@ -478,9 +487,9 @@
                 <span class="text-2xl sm:text-[28px] font-extrabold tracking-tight tabular-nums {% if es_mejor_precio %}text-emerald-600{% else %}text-gray-950{% endif %}">
                   Q{{ "{:,.2f}".format(oferta.precio_gtq) }}
                 </span>
-                {% if es_mejor_precio and resumen.ahorro_maximo_gtq > 0 %}
-                <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full tabular-nums">
-                  Ahorras Q{{ "{:,.0f}".format(resumen.ahorro_maximo_gtq) }}
+                {% if ahorro_item > 0 %}
+                <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full tabular-nums">
+                  Ahorras Q{{ "{:,.2f}".format(ahorro_item) }}
                 </span>
                 {% endif %}
               </div>
@@ -499,11 +508,15 @@
               </div>
             </div>
 
-            <!-- Action Button -->
+            <!-- Action Button with Outbound Click Analytics -->
             <a
               href="{{ oferta.url }}"
               target="_blank"
               rel="noopener noreferrer"
+              data-tienda="{{ oferta.tienda }}"
+              data-titulo="{{ oferta.titulo }}"
+              data-precio="{{ oferta.precio_gtq }}"
+              onclick="techunterTrackOutbound(this)"
               class="mt-4 w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all
                 {% if es_mejor_precio %}
                   bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm
@@ -552,8 +565,8 @@
             <span class="text-xs font-medium text-gray-500">novaviventiatravel.com</span>
           </div>
           <h3 class="text-lg sm:text-xl font-bold text-gray-950 tracking-tight">
-            {% if resumen.ahorro_maximo_gtq and resumen.ahorro_maximo_gtq >= 100 %}
-              ¡Con los <span class="text-emerald-600 tabular-nums">Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</span> que ahorras hoy en tecHunter, planea tu próxima escapada!
+            {% if resumen.ahorro_maximo_gtq and resumen.ahorro_maximo_gtq >= 25 %}
+              ¡Con los <span class="text-emerald-600 tabular-nums">Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</span> que ahorras en este artículo con tecHunter, planea tu próxima escapada!
             {% else %}
               Compra inteligente en Guatemala e invierte tu ahorro en tu próximo viaje inolvidable.
             {% endif %}
@@ -567,6 +580,7 @@
           href="https://novaviventiatravel.com"
           target="_blank"
           rel="noopener noreferrer"
+          onclick="techunterTrack('house_ad_click', 'Nova Viventia Travel', 'Banner Viajes', 'https://novaviventiatravel.com', 0)"
           class="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
         >
           <span>Explorar destinos en novaviventiatravel.com</span>
@@ -574,12 +588,12 @@
         </a>
       </section>
 
-      <!-- Roadmap Banner: Siguientes 3 Tiendas Prioritarias (Cruza Matriz tiendas_ecommerce_guatemala) -->
+      <!-- Roadmap Banner: Siguientes 3 Tiendas Prioritarias -->
       {% if siguientes_tiendas %}
       <div class="mt-6 rounded-2xl border border-gray-200/80 bg-white px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500">
         <div class="flex items-center gap-2">
           <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 font-semibold">Roadmap v5.0</span>
-          <span>18 tiendas activas en Neon DB · Próximas 3 tiendas prioritarias detectadas:</span>
+          <span>18 tiendas activas en Neon DB · Próximas 3 tiendas listas en esqueleto:</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           {% for st in siguientes_tiendas %}
@@ -600,18 +614,63 @@
       <div class="flex items-center gap-2">
         <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.0</span>
         <span>·</span>
-        <span>Lectura Instantánea Neon DB + Background Worker Semilla</span>
+        <span>Lectura Instantánea Neon DB + Analítica Web</span>
       </div>
       <div class="flex flex-wrap items-center gap-4">
         <a href="https://ztechgt.com" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 transition-colors">Z-Tech Imports GT</a>
         <a href="https://novaviventiatravel.com" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 transition-colors">Nova Viventia Travel</a>
+        <a href="/api/analytics/summary" target="_blank" class="hover:text-gray-900 font-mono transition-colors">Analytics JSON</a>
         <a href="/api/seed-status" target="_blank" class="hover:text-gray-900 font-mono transition-colors">Seed & Worker Status</a>
-        <a href="/api/ofertas?q={{ query | urlencode }}&cat={{ categoria_activa }}&gama={{ gama_activa }}" target="_blank" class="hover:text-gray-900 font-mono transition-colors">API JSON</a>
       </div>
     </div>
   </footer>
 
+  <!-- Lightweight Web Analytics & UI Controller -->
   <script>
+    const CURRENT_QUERY = {{ (query or "") | tojson }};
+
+    function techunterTrack(tipo, tienda, titulo, urlDestino, precioGtq) {
+      const payload = JSON.stringify({
+        tipo: tipo || 'custom',
+        query: CURRENT_QUERY,
+        tienda: tienda || '',
+        titulo: titulo || '',
+        url_destino: urlDestino || '',
+        precio_gtq: Number(precioGtq || 0)
+      });
+
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', tipo, {
+          search_term: CURRENT_QUERY,
+          store_name: tienda,
+          item_name: titulo,
+          value: Number(precioGtq || 0),
+          currency: 'GTQ'
+        });
+      }
+
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], { type: 'application/json' });
+        navigator.sendBeacon('/api/analytics/event', blob);
+      } else {
+        fetch('/api/analytics/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          keepalive: true
+        }).catch(() => {});
+      }
+    }
+
+    function techunterTrackOutbound(anchorEl) {
+      if (!anchorEl) return;
+      const tienda = anchorEl.getAttribute('data-tienda') || '';
+      const titulo = anchorEl.getAttribute('data-titulo') || '';
+      const precio = parseFloat(anchorEl.getAttribute('data-precio') || '0');
+      const urlDestino = anchorEl.getAttribute('href') || '';
+      techunterTrack('outbound_click', tienda, titulo, urlDestino, precio);
+    }
+
     let storesExpanded = false;
     function toggleExtraStores() {
       storesExpanded = !storesExpanded;

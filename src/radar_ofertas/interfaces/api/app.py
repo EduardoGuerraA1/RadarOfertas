@@ -1,18 +1,21 @@
 """
 Capa de Interfaces (Web / API) de tecHunter GT v5.0 con FastAPI + Jinja2.
 
-Arquitectura v5.0 (Cero Timeouts 502 en Render):
+Arquitectura v5.0:
   - El buscador web (`GET /` y `GET /api/ofertas`) lee ÚNICAMENTE de Neon DB en milisegundos.
-  - La precarga y actualización de precios ocurre en segundo plano mediante `worker_precarga.py`
-    (tanto por CLI/cron como en el bucle asíncrono de `lifespan`), insertando en `historial_precios`
-    únicamente cuando `_obtener_ultimo_precio_registrado` detecta una variación real de precio.
+  - Cálculo de ahorro 100% verificado por producto idéntico/comparable (con tope lógico comercial),
+    eliminando sumatorias o restas entre artículos distintos del catálogo.
+  - Telemetría y Analítica Web ligera integrada (`/api/analytics/event` y `/api/analytics/summary`)
+    compatible con Google Analytics 4 (`gtag.js`).
+  - Esqueletos listos para las siguientes 3 tiendas prioritarias: Tienda Tigo GT, Office Depot GT y Tropigas.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
-from collections import defaultdict
+import re
+import unicodedata
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -23,6 +26,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from radar_ofertas.application.use_cases.analitica_web import gestor_analitica
 from radar_ofertas.application.use_cases.worker_precarga import (
     ESTADO_WORKER_PRECARGA,
     iniciar_worker_periodico_background,
@@ -37,6 +41,9 @@ from radar_ofertas.domain.seed_data import (
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
+from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
+from radar_ofertas.infrastructure.scrapers.tigo_scraper import TigoScraper
+from radar_ofertas.infrastructure.scrapers.tropigas_scraper import TropigasScraper
 
 logger = logging.getLogger("tecHunter.api")
 
@@ -78,8 +85,8 @@ async def lifespan(app_instance: FastAPI):
 app = FastAPI(
     title="tecHunter GT v5.0 — Comparador Instantáneo en Guatemala",
     description=(
-        "Plataforma de comparación de precios en milisegundos respaldada por Neon DB "
-        "y Worker de Precarga Inteligente sobre 18 tiendas activas en Guatemala."
+        "Plataforma de comparación de precios en milisegundos respaldada por Neon DB, "
+        "Analítica Web en tiempo real y Worker de Precarga Inteligente."
     ),
     version="5.0.0",
     lifespan=lifespan,
@@ -130,10 +137,62 @@ TERMINOS_ZTECH_COMPUTO: tuple[str, ...] = (
     "nas",
 )
 
+STOPWORDS_COMPARACION: frozenset[str] = frozenset(
+    {
+        "de",
+        "la",
+        "el",
+        "en",
+        "con",
+        "para",
+        "por",
+        "y",
+        "o",
+        "un",
+        "una",
+        "del",
+        "los",
+        "las",
+        "al",
+        "color",
+        "negro",
+        "blanco",
+        "gris",
+        "azul",
+        "rojo",
+        "verde",
+        "plata",
+        "plateado",
+        "gt",
+        "guatemala",
+        "oficial",
+        "nuevo",
+        "nueva",
+        "pulgadas",
+        "plg",
+    }
+)
+
+# Registro de esqueletos de la siguiente fase (Top 3 Prioridad v5.0)
+SCRAPERS_FASE_SIGUIENTE: dict[str, Any] = {
+    "tienda-tigo": TigoScraper(habilitado=False),
+    "office-depot": OfficeDepotScraper(habilitado=False),
+    "tropigas": TropigasScraper(habilitado=False),
+}
+
 
 class EscanearRequest(BaseModel):
     query: str = ""
     categoria: str = ""
+
+
+class AnalyticsEventRequest(BaseModel):
+    tipo: str = "custom"
+    query: str = ""
+    tienda: str = ""
+    titulo: str = ""
+    url_destino: str = ""
+    precio_gtq: float = 0.0
 
 
 def _es_busqueda_computo_ztech(query: str, categoria_ui: str = "") -> bool:
@@ -201,37 +260,132 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
     return "tecnologia"
 
 
-def _calcular_ahorro_preciso(ofertas: list[dict[str, Any]]) -> float:
+def _extraer_tokens_comparables(titulo: str) -> set[str]:
     """
-    Calcula el ahorro máximo comparando equipos dentro de la misma familia/modelo o
-    dentro de la misma categoría y gama para evitar comparar un equipo básico con uno profesional.
+    Extrae tokens alfanuméricos significativos de un título para identificar si dos
+    ofertas corresponden exactamente al mismo producto o modelo comercial.
     """
-    if len(ofertas) <= 1:
+    limpio = (titulo or "").lower().strip()
+    descompuesto = unicodedata.normalize("NFD", limpio)
+    sin_tildes = "".join(c for c in descompuesto if unicodedata.category(c) != "Mn")
+    tokens = re.findall(r"[a-z0-9]+", sin_tildes)
+    return {
+        t
+        for t in tokens
+        if len(t) >= 2 and t not in STOPWORDS_COMPARACION
+    }
+
+
+def _son_mismo_articulo_comparable(
+    oferta_base: dict[str, Any], oferta_candidata: dict[str, Any]
+) -> bool:
+    """
+    Verifica estrictamente si dos ofertas representan el MISMO producto comercial
+    para comparar sus precios entre tiendas, evitando comparar un artículo de Q4
+    con otro de Q49,000.
+    """
+    p_base = float(oferta_base.get("precio_gtq") or 0.0)
+    p_cand = float(oferta_candidata.get("precio_gtq") or 0.0)
+    if p_base <= 0 or p_cand <= 0:
+        return False
+
+    p_min = min(p_base, p_cand)
+    p_max = max(p_base, p_cand)
+
+    # Regla comercial 1: El mismo producto entre tiendas en Guatemala no difiere en más de 65%
+    if p_max > p_min * 1.65:
+        return False
+
+    # Regla comercial 2: Misma categoría y misma gama
+    if oferta_base.get("categoria_ui") != oferta_candidata.get("categoria_ui"):
+        return False
+    if oferta_base.get("gama_slug") != oferta_candidata.get("gama_slug"):
+        return False
+
+    # Si comparten el mismo producto_id en base de datos, es el mismo artículo
+    if (
+        oferta_base.get("producto_id")
+        and oferta_base.get("producto_id") == oferta_candidata.get("producto_id")
+    ):
+        return True
+
+    # Si ambos tienen una clave_modelo específica (ej. 'macbook-air-m2', 'dcd776', 'g29')
+    clave_b = str(oferta_base.get("clave_modelo") or "")
+    clave_c = str(oferta_candidata.get("clave_modelo") or "")
+    if clave_b and clave_b == clave_c and ":" not in clave_b:
+        return True
+
+    # Comparación por coincidencia estricta de tokens de marca + modelo/capacidad
+    tokens_b = _extraer_tokens_comparables(str(oferta_base.get("titulo") or ""))
+    tokens_c = _extraer_tokens_comparables(str(oferta_candidata.get("titulo") or ""))
+    if not tokens_b or not tokens_c:
+        return False
+
+    comunes = tokens_b & tokens_c
+    # Exigir al menos 3 tokens significativos en común (o >= 60% del título más corto)
+    min_requeridos = max(3, int(min(len(tokens_b), len(tokens_c)) * 0.6))
+    return len(comunes) >= min_requeridos
+
+
+def _calcular_ahorro_preciso(
+    ofertas: list[dict[str, Any]], query: str = ""
+) -> float:
+    """
+    Calcula el ahorro real por artículo (`oferta['ahorro_gtq']`) y el ahorro destacado
+    del comparador (`resumen['ahorro_maximo_gtq']`) garantizando:
+      1. Que solo se resten precios del MISMO artículo o modelo directo (`_son_mismo_articulo_comparable`).
+      2. Que el ahorro de un producto nunca supere un tope lógico comercial (`<= 55%` del precio
+         del producto y `<= Q2,500.00`), erradicando por completo sumatorias fantasma o ahorros
+         absurdos (como Q49,085 en un producto de Q4.25).
+    """
+    if not ofertas:
         return 0.0
 
-    grupos: dict[str, list[float]] = defaultdict(list)
     for o in ofertas:
-        clave = str(
-            o.get("clave_modelo")
-            or f"{o.get('categoria_ui', 'general')}:{o.get('gama_slug', 'media')}"
-        )
-        grupos[clave].append(
-            float(o.get("costo_real_gtq") or o.get("precio_gtq") or 0.0)
-        )
+        o["ahorro_gtq"] = 0.0
 
-    ahorros_por_grupo = [
-        max(precios_g) - min(precios_g)
-        for precios_g in grupos.values()
-        if len(precios_g) >= 2 and (max(precios_g) - min(precios_g)) > 0
+    if len(ofertas) == 1:
+        return 0.0
+
+    for oferta in ofertas:
+        precio_actual = float(oferta.get("precio_gtq") or 0.0)
+        if precio_actual <= 0:
+            continue
+
+        precios_mismo_articulo = [
+            float(cand.get("precio_gtq") or 0.0)
+            for cand in ofertas
+            if cand is not oferta
+            and _son_mismo_articulo_comparable(oferta, cand)
+            and float(cand.get("precio_gtq") or 0.0) > precio_actual
+        ]
+
+        if precios_mismo_articulo:
+            diferencia_bruta = max(precios_mismo_articulo) - precio_actual
+            tope_logico = min(precio_actual * 0.55, 2500.00)
+            oferta["ahorro_gtq"] = round(min(diferencia_bruta, tope_logico), 2)
+
+    # El ahorro de la Mejor Oferta (#1) tiene prioridad si existe comparación directa
+    ahorro_mejor_oferta = float(ofertas[0].get("ahorro_gtq") or 0.0)
+    if ahorro_mejor_oferta > 0:
+        return ahorro_mejor_oferta
+
+    # Si hay una búsqueda específica (ej. 'volante logitech', 'taladro dewalt'), evaluar
+    # el mejor ahorro verificado entre artículos idénticos dentro de los resultados
+    ahorros_verificados = [
+        float(o.get("ahorro_gtq") or 0.0)
+        for o in ofertas
+        if float(o.get("ahorro_gtq") or 0.0) > 0
     ]
-    if ahorros_por_grupo:
-        return round(max(ahorros_por_grupo), 2)
+    if ahorros_verificados:
+        return round(max(ahorros_verificados), 2)
 
-    precios = [float(o["precio_gtq"]) for o in ofertas]
-    return round(max(precios) - min(precios), 2)
+    return 0.0
 
 
-def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
+def _calcular_resumen(
+    ofertas: list[dict[str, Any]], query: str = ""
+) -> dict[str, Any]:
     conteo_categorias = {
         "computo": sum(1 for o in ofertas if o.get("categoria_ui") == "computo"),
         "smartphones": sum(
@@ -279,8 +433,8 @@ def _calcular_resumen(ofertas: list[dict[str, Any]]) -> dict[str, Any]:
             "ahorro_maximo_gtq": 0.0,
         }
 
+    ahorro = _calcular_ahorro_preciso(ofertas, query=query)
     mejor = ofertas[0]
-    ahorro = _calcular_ahorro_preciso(ofertas)
     total_istore = sum(
         1 for o in ofertas if o["tienda_slug"] in {"istore", "ishop"}
     )
@@ -353,12 +507,38 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok", "service": "tecHunter", "version": "5.0.0"}
 
 
+@app.post("/api/analytics/event")
+async def api_registrar_evento_analitica(
+    payload: AnalyticsEventRequest,
+) -> dict[str, Any]:
+    """
+    Registra un evento de analítica web de visitantes (pageview, search, outbound_click, house_ad_click).
+    """
+    evento = gestor_analitica.registrar_evento(
+        tipo=payload.tipo,
+        query=payload.query,
+        tienda=payload.tienda,
+        titulo=payload.titulo,
+        url_destino=payload.url_destino,
+        precio_gtq=payload.precio_gtq,
+    )
+    return {"status": "ok", "evento": evento}
+
+
+@app.get("/api/analytics/summary")
+async def api_resumen_analitica() -> dict[str, Any]:
+    """
+    Devuelve las métricas acumuladas de visitas totales, términos más buscados y clics
+    salientes en 'Ir a la tienda' y anuncios del holding.
+    """
+    return gestor_analitica.obtener_resumen()
+
+
 @app.get("/api/seed-status")
 async def api_seed_status() -> dict[str, Any]:
     """
     Expone el estado del Worker de Precarga Inteligente, el conteo de productos de
-    `seed_list_guatemala` y el cruce automático de `tiendas_ecommerce_guatemala`
-    con las siguientes 3 tiendas de alta prioridad.
+    `seed_list_guatemala`, los esqueletos de la siguiente fase y el cruce de `tiendas_ecommerce_guatemala`.
     """
     cruce = cruzar_matriz_tiendas_y_prioridades()
     todos_seed = obtener_todos_los_productos_semilla()
@@ -368,8 +548,10 @@ async def api_seed_status() -> dict[str, Any]:
         "categorias_semilla": {
             cat: len(items) for cat, items in seed_list_guatemala.items()
         },
+        "scrapers_fase_siguiente_esqueletos": list(SCRAPERS_FASE_SIGUIENTE.keys()),
         "worker_precarga": ESTADO_WORKER_PRECARGA,
         "matriz_tiendas": cruce,
+        "analitica_resumen": gestor_analitica.obtener_resumen(top_n=5),
     }
 
 
@@ -397,6 +579,11 @@ async def vista_comparador(
     error_db: str | None = None
     ofertas_totales: list[dict[str, Any]] = []
 
+    cat_limpia = cat.strip().lower()
+    gestor_analitica.registrar_visita(
+        query=q, categoria=cat_limpia, tienda=tienda.strip().lower()
+    )
+
     try:
         repositorio = PostgresOfertaRepository()
         ofertas_totales = await asyncio.to_thread(
@@ -406,7 +593,6 @@ async def vista_comparador(
         logger.error("Error consultando Neon DB en GET /: %s", error)
         error_db = str(error)
 
-    cat_limpia = cat.strip().lower()
     if cat_limpia in {
         "computo",
         "smartphones",
@@ -436,13 +622,14 @@ async def vista_comparador(
             key=lambda o: (o.get("costo_real_gtq", 0.0), o.get("precio_gtq", 0.0))
         )
 
-    resumen = _calcular_resumen(ofertas_totales)
-    resumen_visible = _calcular_resumen(ofertas_visibles)
+    resumen = _calcular_resumen(ofertas_totales, query=q)
+    resumen_visible = _calcular_resumen(ofertas_visibles, query=q)
     resumen["mejor_oferta"] = resumen_visible["mejor_oferta"]
     resumen["ahorro_maximo_gtq"] = resumen_visible["ahorro_maximo_gtq"]
 
     destacar_ztech = _es_busqueda_computo_ztech(q, cat_limpia)
     cruce_tiendas = cruzar_matriz_tiendas_y_prioridades()
+    ga_measurement_id = os.environ.get("GA_MEASUREMENT_ID", "").strip()
 
     return templates.TemplateResponse(
         request=request,
@@ -459,6 +646,8 @@ async def vista_comparador(
             "resumen": resumen,
             "destacar_ztech": destacar_ztech,
             "siguientes_tiendas": cruce_tiendas["siguientes_3_alta_prioridad"],
+            "visitas_totales": gestor_analitica.visitas_totales,
+            "ga_measurement_id": ga_measurement_id,
             "error_db": error_db,
         },
     )
@@ -487,7 +676,7 @@ async def api_listar_ofertas(
             "categoria_ui": cat,
             "gama": gama_limpia,
             "destacar_ztech": _es_busqueda_computo_ztech(q, cat),
-            "resumen": _calcular_resumen(ofertas),
+            "resumen": _calcular_resumen(ofertas, query=q),
             "ofertas": ofertas,
         }
     except Exception as error:
@@ -499,8 +688,8 @@ async def api_listar_ofertas(
 async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
     """
     Endpoint asíncrono no bloqueante (v5.0):
-    Para erradicar cualquier error 502 por timeout en Render, delega la actualización
-    al Worker de Precarga en segundo plano (`asyncio.create_task`) y responde de inmediato.
+    Delega la actualización al Worker de Precarga en segundo plano (`asyncio.create_task`)
+    y responde de inmediato para evitar timeouts 502 en Render.
     """
     termino = (payload.query or "").strip()
     if not termino:
