@@ -298,12 +298,13 @@ class PostgresOfertaRepository(OfertaRepository):
                 "moto g",
                 "honor ",
                 "prepago claro",
+                "prepago tigo",
                 "postpago",
                 "galaxy watch",
                 "apple watch",
                 "smartwatch",
             )
-        ) or s == "tienda-claro":
+        ) or s in {"tienda-claro", "tienda-tigo"}:
             return "smartphones"
 
         if any(
@@ -336,6 +337,8 @@ class PostgresOfertaRepository(OfertaRepository):
                 "g29",
                 "logitech",
                 "impresora",
+                "ecotank",
+                "smart tank",
                 "router",
                 "playstation",
                 "ps5",
@@ -344,7 +347,7 @@ class PostgresOfertaRepository(OfertaRepository):
                 "ipad",
                 "tablet",
             )
-        ) or s == "intelaf":
+        ) or s in {"intelaf", "office-depot"}:
             return "computo"
 
         if any(
@@ -382,7 +385,7 @@ class PostgresOfertaRepository(OfertaRepository):
                 "hamilton beach",
                 "hogar",
             )
-        ):
+        ) or s == "tropigas":
             return "hogar"
 
         return "computo"
@@ -653,7 +656,10 @@ class PostgresOfertaRepository(OfertaRepository):
             "tecno-facil",
             "tecnofacil",
             "la-curacao",
+            "tropigas",
             "tienda-claro",
+            "tienda-tigo",
+            "office-depot",
             "intelaf",
             "cemaco",
             "epa",

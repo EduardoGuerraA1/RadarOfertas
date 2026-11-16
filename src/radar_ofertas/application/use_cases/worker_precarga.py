@@ -33,6 +33,7 @@ from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
 from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
+from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
@@ -40,6 +41,8 @@ from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilS
 from radar_ofertas.infrastructure.scrapers.tiendas_oficiales_scraper import (
     TiendasOficialesScraper,
 )
+from radar_ofertas.infrastructure.scrapers.tigo_scraper import TigoScraper
+from radar_ofertas.infrastructure.scrapers.tropigas_scraper import TropigasScraper
 from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 logger = logging.getLogger("tecHunter.worker_precarga")
@@ -105,7 +108,7 @@ async def precargar_termino_semilla(
     timeout_scraper_s: float = 10.0,
 ) -> dict[str, Any]:
     """
-    Ejecuta en paralelo los scrapers ligeros/cloud-safe para un término de `seed_list_guatemala`,
+    Ejecuta en paralelo los 21 scrapers activos para un término de `seed_list_guatemala`,
     filtra con el Motor de Precisión y guarda únicamente cambios reales de precio en Neon DB.
     """
     scrapers: list[tuple[str, Any]] = [
@@ -113,6 +116,7 @@ async def precargar_termino_semilla(
         ("EPA", EpaScraper(timeout_s=int(timeout_scraper_s))),
         ("Novex", NovexScraper(timeout_s=int(timeout_scraper_s))),
         ("Intelaf", IntelafScraper(headless=True, timeout_s=int(timeout_scraper_s))),
+        ("Office Depot", OfficeDepotScraper(timeout_s=int(timeout_scraper_s))),
         (
             "Tecno Fácil",
             TecnoFacilScraper(
@@ -122,7 +126,9 @@ async def precargar_termino_semilla(
             ),
         ),
         ("La Curacao", LaCuracaoScraper(timeout_s=int(timeout_scraper_s))),
+        ("Tropigas", TropigasScraper(timeout_s=int(timeout_scraper_s))),
         ("Tienda Claro", ClaroScraper(timeout_s=int(timeout_scraper_s))),
+        ("Tienda Tigo", TigoScraper(timeout_s=int(timeout_scraper_s))),
         ("PriceSmart", PriceSmartScraper(timeout_s=int(timeout_scraper_s))),
         ("Oficiales", TiendasOficialesScraper(timeout_s=int(timeout_scraper_s))),
         ("Walmart Grupo", WalmartScraper(timeout_s=int(timeout_scraper_s))),

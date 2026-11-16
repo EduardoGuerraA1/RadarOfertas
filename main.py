@@ -1,6 +1,9 @@
 """
-Punto de entrada principal (Orquestador) de tecHunter GT v4.0 / RadarOfertas.
-Coordina la ejecución concurrente de los scrapers locales en Guatemala:
+Punto de entrada principal (Orquestador) de tecHunter GT v5.1 / RadarOfertas.
+Coordina la ejecución concurrente de los 21 scrapers locales en Guatemala:
+  - Tienda Tigo GT (tienda.tigo.com.gt)
+  - Office Depot GT (officedepot.com.gt)
+  - Almacenes Tropigas GT (almacenestropigas.com/guatemala)
   - iStore / iShop GT (ishop.gt)
   - EPA Guatemala (gt.epaenlinea.com)
   - Novex Guatemala (novex.com.gt)
@@ -16,8 +19,6 @@ Coordina la ejecución concurrente de los scrapers locales en Guatemala:
   - Supermercados La Torre (latorre.com.gt)
   - Tiendas Max (max.com.gt)
   - Kemik (kemik.gt)
-Aplica el Motor de Precisión de Modelos y Filtro Inteligente Anti-Ruido, compara precios
-en Quetzales (GTQ) y persiste de forma optimizada (solo cambios de precio) en Neon DB.
 """
 from __future__ import annotations
 
@@ -29,7 +30,6 @@ import sys
 
 from dotenv import load_dotenv
 
-# Asegurar que Python encuentre el paquete dentro de src/
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
@@ -49,6 +49,7 @@ from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
+from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
@@ -56,6 +57,8 @@ from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilS
 from radar_ofertas.infrastructure.scrapers.tiendas_oficiales_scraper import (
     TiendasOficialesScraper,
 )
+from radar_ofertas.infrastructure.scrapers.tigo_scraper import TigoScraper
+from radar_ofertas.infrastructure.scrapers.tropigas_scraper import TropigasScraper
 from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 load_dotenv()
@@ -117,16 +120,15 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Orquestador principal de tecHunter GT v4.0 "
-            "(iStore + EPA + Novex + Intelaf + Tecno Fácil + La Curacao + Tienda Claro + "
-            "PriceSmart + Siman/Elektra + Grupo Walmart + Cemaco + Pacifiko + La Torre + Max + Kemik)."
+            "Orquestador principal de tecHunter GT v5.1 "
+            "(21 tiendas activas incluyendo Tigo, Office Depot, Tropigas, iStore, EPA y Novex)."
         )
     )
     parser.add_argument(
         "query",
         nargs="?",
         default="laptop",
-        help="Término de búsqueda (ej. 'macbook air m2', 'taladro', 'iphone 16', 'samsung', 'pedigree')",
+        help="Término de búsqueda (ej. 'macbook air m2', 'taladro', 'iphone 16', 'refrigeradora mabe')",
     )
     parser.add_argument(
         "--categoria",
@@ -174,51 +176,9 @@ PAYLOAD_SIMULADO_KEMIK = [
             "availability": "https://schema.org/InStock",
         },
     },
-    {
-        "@type": "Product",
-        "name": "Logitech Driving Force Shifter Palanca de Cambios para Volante G29 y G920",
-        "sku": "LOG-941-000119",
-        "url": "https://www.kemik.gt/producto/logitech-driving-force-shifter-palanca-cambios-g29-g920",
-        "image": "/images/catalog/log-shifter-g29.jpg",
-        "offers": [
-            {
-                "@type": "Offer",
-                "priceCurrency": "GTQ",
-                "price": 649.00,
-            }
-        ],
-    },
 ]
 
 PAYLOAD_SIMULADO_MAX_GRAPHQL = [
-    {
-        "name": "Samsung Galaxy Watch 7 40mm Bluetooth Smartwatch Verde",
-        "sku": "SM-L300NZGAAXO",
-        "url_key": "samsung-galaxy-watch-7-40mm-bluetooth-smartwatch-verde",
-        "url_suffix": ".html",
-        "small_image": {
-            "url": "https://www.max.com.gt/media/catalog/product/s/m/sm-l300nzgaaxo_1.jpg"
-        },
-        "price_range": {
-            "minimum_price": {
-                "final_price": {"value": 2199.00, "currency": "GTQ"}
-            }
-        },
-    },
-    {
-        "name": "Samsung Galaxy Watch Ultra LTE 47mm Titanio Gris",
-        "sku": "SM-L705FDAAAXO",
-        "url_key": "samsung-galaxy-watch-ultra-lte-47mm-titanio-gris",
-        "url_suffix": ".html",
-        "small_image": {
-            "url": "https://www.max.com.gt/media/catalog/product/s/m/sm-l705fdaaaxo_1.jpg"
-        },
-        "price_range": {
-            "minimum_price": {
-                "final_price": {"value": 4999.00, "currency": "GTQ"}
-            }
-        },
-    },
     {
         "name": "Volante Logitech G29 Driving Force para PlayStation y PC",
         "sku": "941-000110",
@@ -238,44 +198,10 @@ PAYLOAD_SIMULADO_MAX_GRAPHQL = [
 
 def mostrar_comparativa_en_consola(
     termino: str,
-    ofertas_kemik: list[OfertaLocal],
-    ofertas_pacifiko: list[OfertaLocal],
-    ofertas_super: list[OfertaLocal],
-    ofertas_max: list[OfertaLocal],
-    ofertas_tecnofacil: list[OfertaLocal],
-    ofertas_cemaco: list[OfertaLocal],
-    ofertas_walmart_grupo: list[OfertaLocal],
-    ofertas_oficiales: list[OfertaLocal],
-    ofertas_pricesmart: list[OfertaLocal],
-    ofertas_intelaf: list[OfertaLocal],
-    ofertas_lacuracao: list[OfertaLocal],
-    ofertas_claro: list[OfertaLocal],
-    ofertas_istore: list[OfertaLocal],
-    ofertas_epa: list[OfertaLocal],
-    ofertas_novex: list[OfertaLocal],
+    listas_ofertas: list[list[OfertaLocal]],
     limite: int,
 ) -> list[OfertaLocal]:
-    """
-    Aplica el Motor de Precisión de Modelos y Filtro Inteligente Anti-Ruido, ordena y
-    muestra las ofertas de todas las tiendas de menor a mayor precio.
-    """
-    brutas = [
-        *ofertas_istore,
-        *ofertas_epa,
-        *ofertas_novex,
-        *ofertas_kemik,
-        *ofertas_pacifiko,
-        *ofertas_super,
-        *ofertas_max,
-        *ofertas_tecnofacil,
-        *ofertas_cemaco,
-        *ofertas_walmart_grupo,
-        *ofertas_oficiales,
-        *ofertas_pricesmart,
-        *ofertas_intelaf,
-        *ofertas_lacuracao,
-        *ofertas_claro,
-    ]
+    brutas = [oferta for sublista in listas_ofertas for oferta in sublista]
     relevantes = [
         o
         for o in filtrar_ofertas_relevantes(brutas, termino)
@@ -284,9 +210,12 @@ def mostrar_comparativa_en_consola(
     todas_ordenadas = sorted(relevantes, key=lambda o: o.precio_gtq)
 
     print("\n" + "=" * 110)
-    print(f" RADAR COMPARADOR TECHUNTER GT v4.0 | Búsqueda: '{termino}'")
+    print(f" RADAR COMPARADOR TECHUNTER GT v5.1 (21 TIENDAS) | Búsqueda: '{termino}'")
     print(
         f" Resumen: "
+        f"Tigo ({sum(1 for o in todas_ordenadas if o.tienda == 'Tienda Tigo')}) | "
+        f"Office Depot ({sum(1 for o in todas_ordenadas if o.tienda == 'Office Depot')}) | "
+        f"Tropigas ({sum(1 for o in todas_ordenadas if o.tienda == 'Tropigas')}) | "
         f"EPA ({sum(1 for o in todas_ordenadas if o.tienda == 'EPA')}) | "
         f"Novex ({sum(1 for o in todas_ordenadas if o.tienda == 'Novex')}) | "
         f"iStore ({sum(1 for o in todas_ordenadas if o.tienda in {'iStore', 'iShop'})}) | "
@@ -295,13 +224,6 @@ def mostrar_comparativa_en_consola(
         f"Claro ({sum(1 for o in todas_ordenadas if o.tienda == 'Tienda Claro')}) | "
         f"Tecno Fácil ({sum(1 for o in todas_ordenadas if o.tienda == 'Tecno Fácil')}) | "
         f"PriceSmart ({sum(1 for o in todas_ordenadas if o.tienda == 'PriceSmart')}) | "
-        f"Siman/Elektra ({sum(1 for o in todas_ordenadas if o.tienda in {'Siman', 'Elektra'})}) | "
-        f"Walmart/Paiz/Maxi ({sum(1 for o in todas_ordenadas if o.tienda in {'Walmart', 'Paiz', 'Maxi Despensa'})}) | "
-        f"Cemaco ({sum(1 for o in todas_ordenadas if o.tienda == 'Cemaco')}) | "
-        f"Pacifiko ({sum(1 for o in todas_ordenadas if o.tienda == 'Pacifiko')}) | "
-        f"La Torre ({sum(1 for o in todas_ordenadas if o.tienda == 'La Torre')}) | "
-        f"Max ({sum(1 for o in todas_ordenadas if o.tienda == 'Tiendas Max')}) | "
-        f"Kemik ({sum(1 for o in todas_ordenadas if o.tienda == 'Kemik')}) | "
         f"Total ({len(todas_ordenadas)} de {len(brutas)} brutas)"
     )
     print("=" * 110)
@@ -342,11 +264,6 @@ def guardar_en_base_de_datos(
         )
         return
 
-    logger.info(
-        "Conectando a Neon DB para sincronizar %d ofertas filtradas (categoría='%s')...",
-        len(ofertas),
-        categoria_slug,
-    )
     repositorio = PostgresOfertaRepository(database_url=database_url)
     insertados = repositorio.guardar_ofertas(ofertas, categoria_slug=categoria_slug)
     print(
@@ -360,11 +277,6 @@ async def ejecutar_orquestador() -> None:
     termino = args.query
     categoria = _detectar_categoria(termino, args.categoria)
 
-    logger.info(
-        "Iniciando orquestador multicapa tecHunter GT v4.0 para el término: '%s' (categoría: '%s')",
-        termino,
-        categoria,
-    )
     kemik_scraper = KemikScraper(headless=not args.headed)
     pacifiko_scraper = PacifikoScraper()
     super_scraper = SuperScraper()
@@ -384,128 +296,65 @@ async def ejecutar_orquestador() -> None:
     istore_scraper = IStoreScraper()
     epa_scraper = EpaScraper()
     novex_scraper = NovexScraper()
+    tigo_scraper = TigoScraper()
+    officedepot_scraper = OfficeDepotScraper()
+    tropigas_scraper = TropigasScraper()
 
-    try:
-        if args.simular:
-            logger.info(
-                "Modo --simular activo: consultando iStore, EPA, Novex, Intelaf, La Curacao, Claro, Tecno Fácil, PriceSmart, Siman, Elektra, Walmart, Paiz, Maxi Despensa, Cemaco, Pacifiko y La Torre en vivo..."
-            )
-            (
-                ofertas_pacifiko,
-                ofertas_super,
-                ofertas_tecnofacil,
-                ofertas_cemaco,
-                ofertas_walmart_grupo,
-                ofertas_oficiales,
-                ofertas_pricesmart,
-                ofertas_intelaf,
-                ofertas_lacuracao,
-                ofertas_claro,
-                ofertas_istore,
-                ofertas_epa,
-                ofertas_novex,
-            ) = await asyncio.gather(
-                pacifiko_scraper.buscar_producto(termino),
-                super_scraper.buscar_producto(termino),
-                tecnofacil_scraper.buscar_producto(termino),
-                cemaco_scraper.buscar_producto(termino),
-                walmart_scraper.buscar_producto(termino),
-                oficiales_scraper.buscar_producto(termino),
-                pricesmart_scraper.buscar_producto(termino),
-                intelaf_scraper.buscar_producto(termino),
-                lacuracao_scraper.buscar_producto(termino),
-                claro_scraper.buscar_producto(termino),
-                istore_scraper.buscar_producto(termino),
-                epa_scraper.buscar_producto(termino),
-                novex_scraper.buscar_producto(termino),
-            )
-            termino_lower = termino.lower()
-            ofertas_kemik = (
-                [
-                    oferta
-                    for item in PAYLOAD_SIMULADO_KEMIK
-                    if (oferta := kemik_scraper._mapear_producto_ld_a_oferta(item))
-                    is not None
-                ]
-                if "logitech" in termino_lower or "volante" in termino_lower
-                else []
-            )
-            items_max_filtrados = [
-                item
-                for item in PAYLOAD_SIMULADO_MAX_GRAPHQL
-                if any(tok in item["name"].lower() for tok in termino_lower.split())
+    scrapers_en_vivo = [
+        pacifiko_scraper.buscar_producto(termino),
+        super_scraper.buscar_producto(termino),
+        tecnofacil_scraper.buscar_producto(termino),
+        cemaco_scraper.buscar_producto(termino),
+        walmart_scraper.buscar_producto(termino),
+        oficiales_scraper.buscar_producto(termino),
+        pricesmart_scraper.buscar_producto(termino),
+        intelaf_scraper.buscar_producto(termino),
+        lacuracao_scraper.buscar_producto(termino),
+        claro_scraper.buscar_producto(termino),
+        istore_scraper.buscar_producto(termino),
+        epa_scraper.buscar_producto(termino),
+        novex_scraper.buscar_producto(termino),
+        tigo_scraper.buscar_producto(termino),
+        officedepot_scraper.buscar_producto(termino),
+        tropigas_scraper.buscar_producto(termino),
+    ]
+
+    if args.simular:
+        listas = list(await asyncio.gather(*scrapers_en_vivo))
+        termino_lower = termino.lower()
+        ofertas_kemik = (
+            [
+                oferta
+                for item in PAYLOAD_SIMULADO_KEMIK
+                if (oferta := kemik_scraper._mapear_producto_ld_a_oferta(item))
+                is not None
             ]
-            ofertas_max = max_scraper.parsear_respuesta_graphql(
-                {"data": {"products": {"items": items_max_filtrados}}}
-            )
-        else:
-            (
-                ofertas_kemik,
-                ofertas_pacifiko,
-                ofertas_super,
-                ofertas_max,
-                ofertas_tecnofacil,
-                ofertas_cemaco,
-                ofertas_walmart_grupo,
-                ofertas_oficiales,
-                ofertas_pricesmart,
-                ofertas_intelaf,
-                ofertas_lacuracao,
-                ofertas_claro,
-                ofertas_istore,
-                ofertas_epa,
-                ofertas_novex,
-            ) = await asyncio.gather(
+            if "logitech" in termino_lower or "volante" in termino_lower
+            else []
+        )
+        items_max_filtrados = [
+            item
+            for item in PAYLOAD_SIMULADO_MAX_GRAPHQL
+            if any(tok in item["name"].lower() for tok in termino_lower.split())
+        ]
+        ofertas_max = max_scraper.parsear_respuesta_graphql(
+            {"data": {"products": {"items": items_max_filtrados}}}
+        )
+        listas.extend([ofertas_kemik, ofertas_max])
+    else:
+        listas = list(
+            await asyncio.gather(
                 kemik_scraper.buscar_producto(termino),
-                pacifiko_scraper.buscar_producto(termino),
-                super_scraper.buscar_producto(termino),
                 max_scraper.buscar_producto(termino),
-                tecnofacil_scraper.buscar_producto(termino),
-                cemaco_scraper.buscar_producto(termino),
-                walmart_scraper.buscar_producto(termino),
-                oficiales_scraper.buscar_producto(termino),
-                pricesmart_scraper.buscar_producto(termino),
-                intelaf_scraper.buscar_producto(termino),
-                lacuracao_scraper.buscar_producto(termino),
-                claro_scraper.buscar_producto(termino),
-                istore_scraper.buscar_producto(termino),
-                epa_scraper.buscar_producto(termino),
-                novex_scraper.buscar_producto(termino),
+                *scrapers_en_vivo,
             )
-
-        ofertas_unificadas = mostrar_comparativa_en_consola(
-            termino,
-            ofertas_kemik,
-            ofertas_pacifiko,
-            ofertas_super,
-            ofertas_max,
-            ofertas_tecnofacil,
-            ofertas_cemaco,
-            ofertas_walmart_grupo,
-            ofertas_oficiales,
-            ofertas_pricesmart,
-            ofertas_intelaf,
-            ofertas_lacuracao,
-            ofertas_claro,
-            ofertas_istore,
-            ofertas_epa,
-            ofertas_novex,
-            args.limite,
         )
 
-        if not ofertas_unificadas:
-            print(
-                f"\n⚠️ No se encontraron ofertas principales para '{termino}' en ninguna tienda.\n"
-                f'💡 Prueba ejecutando: python main.py "{termino}" --headed'
-            )
-            return
-
-        if not args.sin_db:
-            guardar_en_base_de_datos(ofertas_unificadas, categoria)
-
-    except Exception as error:
-        logger.error("Error crítico en el orquestador: %s", error)
-        raise
+    ofertas_unificadas = mostrar_comparativa_en_consola(
+        termino, listas, args.limite
+    )
+    if ofertas_unificadas and not args.sin_db:
+        guardar_en_base_de_datos(ofertas_unificadas, categoria)
 
 
 if __name__ == "__main__":

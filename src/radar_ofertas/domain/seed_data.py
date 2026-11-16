@@ -422,7 +422,7 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
     ],
 }
 
-# Las 18 tiendas actualmente operativas en tecHunter GT (con su slug en Neon DB)
+# Las 21 tiendas actualmente operativas en tecHunter GT v5.1 (con su slug en Neon DB)
 TIENDAS_OPERATIVAS_TECHUNTER: tuple[dict[str, str], ...] = (
     {"slug": "tiendas-max", "nombre": "Tiendas Max", "alias_matriz": "Max Distelsa", "url": "https://www.max.com.gt"},
     {"slug": "tecno-facil", "nombre": "Tecno Fácil", "alias_matriz": "Tecno Fácil (Grupo Distelsa)", "url": "https://www.tecnofacil.com.gt"},
@@ -432,10 +432,13 @@ TIENDAS_OPERATIVAS_TECHUNTER: tuple[dict[str, str], ...] = (
     {"slug": "siman", "nombre": "Siman", "alias_matriz": "Siman Guatemala", "url": "https://gt.siman.com"},
     {"slug": "elektra", "nombre": "Elektra", "alias_matriz": "Elektra Guatemala", "url": "https://www.elektra.com.gt"},
     {"slug": "la-curacao", "nombre": "La Curacao", "alias_matriz": "La Curacao", "url": "https://www.lacuracaonline.com/guatemala"},
+    {"slug": "tropigas", "nombre": "Tropigas", "alias_matriz": "Tropigas", "url": "https://www.almacenestropigas.com/guatemala"},
     {"slug": "intelaf", "nombre": "Intelaf", "alias_matriz": "Intelaf", "url": "https://www.intelaf.com"},
+    {"slug": "office-depot", "nombre": "Office Depot", "alias_matriz": "Office Depot Guatemala", "url": "https://www.officedepot.com.gt"},
     {"slug": "istore", "nombre": "iStore", "alias_matriz": "iShop Guatemala", "url": "https://ishop.gt"},
     {"slug": "ishop", "nombre": "iShop", "alias_matriz": "iShop Guatemala", "url": "https://ishop.gt"},
     {"slug": "tienda-claro", "nombre": "Tienda Claro", "alias_matriz": "Tienda Claro Guatemala", "url": "https://www.claro.com.gt"},
+    {"slug": "tienda-tigo", "nombre": "Tienda Tigo", "alias_matriz": "Tienda Tigo Guatemala", "url": "https://tienda.tigo.com.gt"},
     {"slug": "epa", "nombre": "EPA", "alias_matriz": "Ferretería EPA", "url": "https://gt.epaenlinea.com"},
     {"slug": "novex", "nombre": "Novex", "alias_matriz": "Novex Guatemala", "url": "https://www.novex.com.gt"},
     {"slug": "walmart", "nombre": "Walmart", "alias_matriz": "Walmart Guatemala", "url": "https://www.walmart.com.gt"},
@@ -457,7 +460,7 @@ MAPEO_CATEGORIA_SEED_A_DB: dict[str, str] = {
 def obtener_todos_los_productos_semilla() -> list[tuple[str, str, str]]:
     """
     Retorna la lista plana de tuplas `(categoria_seed, categoria_db, termino_producto)`
-    para los 140+ productos de alta demanda en Guatemala.
+    para los productos de alta demanda en Guatemala.
     """
     resultado: list[tuple[str, str, str]] = []
     for cat_seed, productos in seed_list_guatemala.items():
@@ -469,12 +472,9 @@ def obtener_todos_los_productos_semilla() -> list[tuple[str, str, str]]:
 
 def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     """
-    Cruza automáticamente `tiendas_ecommerce_guatemala` con las 18 tiendas operativas
-    de tecHunter GT e identifica las siguientes 3 tiendas de alta prioridad para construir
-    sus scrapers en la siguiente iteración:
-      1. Tienda Tigo Guatemala (https://tienda.tigo.com.gt) — Paridad duopólica con Claro en Smartphones.
-      2. Office Depot Guatemala (https://www.officedepot.com.gt) — Referente corporativo en Cómputo, Impresoras y Oficina.
-      3. Tropigas (https://www.almacenestropigas.com/guatemala) — Hermano de grupo de La Curacao con fuerte tracción en Línea Blanca y Hogar.
+    Cruza automáticamente `tiendas_ecommerce_guatemala` con las 21 tiendas operativas
+    de tecHunter GT v5.1 (incluyendo las recién activadas Tienda Tigo Guatemala,
+    Office Depot Guatemala y Tropigas) e identifica las siguientes tiendas en el backlog.
     """
     nombres_operativos_norm = {
         t["alias_matriz"].strip().lower() for t in TIENDAS_OPERATIVAS_TECHUNTER
@@ -489,9 +489,12 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
         "siman.com",
         "elektra.com.gt",
         "lacuracaonline.com",
+        "almacenestropigas.com",
         "intelaf.com",
+        "officedepot.com.gt",
         "ishop.gt",
         "claro.com.gt",
+        "tienda.tigo.com.gt",
         "epa.biz",
         "epaenlinea.com",
         "novex.com.gt",
@@ -506,29 +509,17 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     tiendas_pendientes: list[dict[str, Any]] = []
 
     pesos_prioridad_estrategica: dict[str, tuple[int, str]] = {
-        "Tienda Tigo Guatemala": (
-            100,
-            "Prioridad #1: Completa el duopolio de operadoras móviles junto a Tienda Claro GT en el vertical de Smartphones.",
-        ),
-        "Office Depot Guatemala": (
-            95,
-            "Prioridad #2: Líder en cómputo corporativo, laptops de productividad, monitores e impresoras EcoTank/Smart Tank.",
-        ),
-        "Tropigas": (
-            90,
-            "Prioridad #3: Alto volumen en línea blanca (refrigeradoras Mabe/LG, estufas y lavadoras) y cuotas populares.",
-        ),
         "El Gallo Más Gallo": (
-            84,
-            "Fuerte competidor en línea blanca, pantallas y smartphones a nivel nacional.",
+            92,
+            "Prioridad #1 en backlog: Fuerte competidor nacional en línea blanca, pantallas y smartphones.",
         ),
         "Arca de Noé": (
-            80,
-            "Especialista líder en mascotas en Guatemala para cruzar alimento premium contra La Torre y Walmart.",
+            88,
+            "Prioridad #2 en backlog: Especialista líder en mascotas en Guatemala para cruzar alimento contra La Torre y Walmart.",
         ),
         "Samsung Store Guatemala": (
-            78,
-            "Tienda oficial directa de Samsung para precios de referencia en Galaxy S/A y Bespoke.",
+            85,
+            "Prioridad #3 en backlog: Tienda oficial directa de Samsung para precios de referencia en Galaxy S/A y Bespoke.",
         ),
     }
 
@@ -570,7 +561,12 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     siguientes_3_alta_prioridad = tiendas_pendientes[:3]
 
     return {
-        "total_operativas_sistema": 18,
+        "total_operativas_sistema": 21,
+        "tiendas_recien_activadas_v5_1": [
+            "Tienda Tigo Guatemala",
+            "Office Depot Guatemala",
+            "Tropigas",
+        ],
         "total_catalogo_matriz": len(tiendas_activas_en_matriz) + len(tiendas_pendientes),
         "operativas_cruzadas": tiendas_activas_en_matriz,
         "pendientes_ordenadas": tiendas_pendientes,

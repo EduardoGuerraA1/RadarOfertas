@@ -47,20 +47,25 @@ def test_seed_list_guatemala_contiene_5_verticales_y_productos_clave() -> None:
     assert "Incaparina original 450g" in nombres
 
 
-def test_cruce_matriz_tiendas_identifica_18_operativas_y_top_3_prioridad() -> None:
+def test_cruce_matriz_tiendas_identifica_21_operativas_y_3_recien_activadas_v5_1() -> None:
     assert len(tiendas_ecommerce_guatemala) == 6
     reporte = cruzar_matriz_tiendas_y_prioridades()
 
-    assert reporte["total_operativas_sistema"] == 18
-    assert len(reporte["operativas_cruzadas"]) >= 14
+    assert reporte["total_operativas_sistema"] == 21
+    assert len(reporte["operativas_cruzadas"]) >= 17
+    assert reporte["tiendas_recien_activadas_v5_1"] == [
+        "Tienda Tigo Guatemala",
+        "Office Depot Guatemala",
+        "Tropigas",
+    ]
 
     top_3 = reporte["siguientes_3_alta_prioridad"]
     assert len(top_3) == 3
     nombres_top_3 = [t["nombre"] for t in top_3]
     assert nombres_top_3 == [
-        "Tienda Tigo Guatemala",
-        "Office Depot Guatemala",
-        "Tropigas",
+        "El Gallo Más Gallo",
+        "Arca de Noé",
+        "Samsung Store Guatemala",
     ]
 
 
@@ -138,10 +143,46 @@ def test_calculo_ahorro_no_mezcla_productos_distintos_ni_genera_ahorros_absurdos
     assert ofertas_mismo_producto[1]["ahorro_gtq"] == 0.0
 
 
-def test_gestor_analitica_web_registra_visitas_busquedas_y_clics_salientes() -> None:
+def test_gestor_analitica_web_filtra_bots_uptimerobot_y_valida_token_admin() -> None:
+    from radar_ofertas.application.use_cases.analitica_web import (
+        es_bot_o_monitor,
+        es_token_admin_valido,
+    )
+
     analitica = GestorAnaliticaWeb()
-    analitica.registrar_visita(query="MacBook Air M2", categoria="computo")
-    analitica.registrar_visita(query="MacBook Air M2", categoria="computo")
+    ua_humano = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15"
+    ua_uptimerobot = "Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)"
+
+    assert es_bot_o_monitor(ua_uptimerobot) is True
+    assert es_bot_o_monitor(ua_humano, metodo_http="HEAD") is True
+    assert es_bot_o_monitor(ua_humano, metodo_http="GET") is False
+
+    # 2 visitas humanas reales
+    assert analitica.registrar_visita(
+        query="MacBook Air M2",
+        categoria="computo",
+        user_agent=ua_humano,
+        metodo_http="GET",
+    ) is True
+    assert analitica.registrar_visita(
+        query="MacBook Air M2",
+        categoria="computo",
+        user_agent=ua_humano,
+        metodo_http="GET",
+    ) is True
+
+    # Pings de UptimeRobot y HEAD son descartados automáticamente
+    assert analitica.registrar_visita(
+        query="",
+        user_agent=ua_uptimerobot,
+        metodo_http="GET",
+    ) is False
+    assert analitica.registrar_visita(
+        query="",
+        user_agent=ua_humano,
+        metodo_http="HEAD",
+    ) is False
+
     analitica.registrar_evento(
         tipo="outbound_click",
         query="MacBook Air M2",
@@ -149,10 +190,22 @@ def test_gestor_analitica_web_registra_visitas_busquedas_y_clics_salientes() -> 
         titulo='Apple MacBook Air 13" M2',
         url_destino="https://ishop.gt/products/macbook-air-m2",
         precio_gtq=8999.00,
+        user_agent=ua_humano,
+    )
+    # Evento desde bot ignorado
+    analitica.registrar_evento(
+        tipo="outbound_click",
+        query="MacBook Air M2",
+        tienda="iStore",
+        titulo='Apple MacBook Air 13" M2',
+        url_destino="https://ishop.gt/products/macbook-air-m2",
+        precio_gtq=8999.00,
+        user_agent=ua_uptimerobot,
     )
 
     resumen = analitica.obtener_resumen()
     assert resumen["visitas_totales"] == 2
+    assert resumen["pings_bots_ignorados"] == 3
     assert resumen["busquedas_totales"] == 2
     assert resumen["clics_salientes_totales"] == 1
     assert resumen["top_terminos_busqueda"][0] == {
@@ -164,15 +217,33 @@ def test_gestor_analitica_web_registra_visitas_busquedas_y_clics_salientes() -> 
         "clics": 1,
     }
 
+    assert es_token_admin_valido("secreto") is True
+    assert es_token_admin_valido("publico_invalido") is False
 
-def test_esqueletos_siguientes_3_tiendas_prioritarias() -> None:
-    tigo = TigoScraper()
-    officedepot = OfficeDepotScraper()
-    tropigas = TropigasScraper()
 
-    assert asyncio.run(tigo.buscar_producto("iphone 16")) == []
-    assert asyncio.run(officedepot.buscar_producto("impresora epson")) == []
-    assert asyncio.run(tropigas.buscar_producto("refrigeradora mabe")) == []
+def test_activacion_real_3_tiendas_prioritarias_tigo_officedepot_tropigas() -> None:
+    tigo = TigoScraper(simular=True)
+    officedepot = OfficeDepotScraper(simular=True)
+    tropigas = TropigasScraper(simular=True)
+
+    res_tigo = asyncio.run(tigo.buscar_producto("iphone 16"))
+    res_od = asyncio.run(officedepot.buscar_producto("impresora epson"))
+    res_tropigas = asyncio.run(tropigas.buscar_producto("refrigeradora mabe"))
+
+    assert len(res_tigo) >= 1
+    assert res_tigo[0].tienda == "Tienda Tigo"
+    assert res_tigo[0].precio_gtq > Decimal("0")
+
+    assert len(res_od) >= 1
+    assert res_od[0].tienda == "Office Depot"
+    assert res_od[0].precio_gtq > Decimal("0")
+
+    assert len(res_tropigas) >= 1
+    assert res_tropigas[0].tienda == "Tropigas"
+    assert res_tropigas[0].precio_gtq > Decimal("0")
+
+    # Modo deshabilitado sigue disponible si se requiere apagar manualmente
+    assert asyncio.run(TigoScraper(habilitado=False).buscar_producto("iphone 16")) == []
 
     ofertas_tigo = tigo.parsear_respuesta_catalogo(
         {

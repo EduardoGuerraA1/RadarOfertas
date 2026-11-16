@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>tecHunter GT v5.0 — El mejor precio. Ya calculado con envío.</title>
+  <title>tecHunter GT v5.1 — El mejor precio. Ya calculado con envío.</title>
   {% if ga_measurement_id %}
   <!-- Google Analytics 4 (GA4) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
@@ -64,7 +64,7 @@
 </head>
 <body class="min-h-screen flex flex-col selection:bg-emerald-500/15 selection:text-emerald-900">
 
-  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.0) -->
+  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.1) -->
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-gray-200/80">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       <!-- Brand -->
@@ -78,7 +78,7 @@
         </div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-base font-bold tracking-tight text-gray-950">tec<span class="text-emerald-600">Hunter</span></span>
-          <span class="text-xs font-medium text-gray-400">GT v5.0</span>
+          <span class="text-xs font-medium text-gray-400">GT v5.1</span>
         </div>
       </a>
 
@@ -96,14 +96,16 @@
           </svg>
           <span>{{ resumen.total }} productos</span>
         </div>
+        {% if es_admin %}
         <a
           href="/api/analytics/summary"
           target="_blank"
-          title="Ver telemetría de visitas, búsquedas populares y clics salientes"
-          class="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-xs font-medium text-emerald-800 hover:bg-emerald-100/80 transition-colors tabular-nums"
+          title="Panel Privado Admin: Telemetría de visitas reales (sin bots), búsquedas y clics salientes"
+          class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-xs font-medium text-emerald-800 hover:bg-emerald-100/80 transition-colors tabular-nums"
         >
-          <span>📊 {{ visitas_totales | default(1) }} visitas</span>
+          <span>🔒 Admin · 📊 {{ visitas_totales | default(0) }} visitas</span>
         </a>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -114,14 +116,14 @@
     <section class="pt-10 pb-7 sm:pt-14 sm:pb-9 px-4 sm:px-6 lg:px-8 border-b border-gray-200/80">
       <div class="max-w-4xl mx-auto text-center">
         <p class="text-xs sm:text-sm font-medium text-gray-500 tracking-wide mb-3">
-          Comparador instantáneo sobre Neon DB · 18 Tiendas en Guatemala
+          Comparador gratuito e instantáneo sobre Neon DB · 21 Tiendas en Guatemala
         </p>
         <h1 class="text-3xl sm:text-5xl lg:text-[54px] font-extrabold tracking-tight text-gray-950 leading-[1.08]">
           El mejor precio.<br />
           <span class="text-gray-400 font-bold">Ya calculado con envío.</span>
         </h1>
         <p class="mt-4 text-sm sm:text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-          Consulta en milisegundos precios precargados de iStore, EPA, Novex, Intelaf, Tecno Fácil, La Curacao, Claro, PriceSmart, Max, Pacifiko, Kemik, Siman, Walmart y Cemaco.
+          Consulta en milisegundos precios precargados de iStore, EPA, Novex, Intelaf, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Max, Pacifiko, Kemik, Siman, Walmart y Cemaco.
         </p>
 
         <!-- Search Bar Capsule (100% Instant Neon DB Read — Zero 502 Timeout Risk) -->
@@ -297,6 +299,9 @@
         ('epa', 'EPA', resumen.total_epa, 'bg-yellow-500'),
         ('novex', 'Novex', resumen.total_novex, 'bg-orange-600'),
         ('intelaf', 'Intelaf', resumen.total_intelaf, 'bg-amber-500'),
+        ('office-depot', 'Office Depot', resumen.total_office_depot, 'bg-red-700'),
+        ('tienda-tigo', 'Tigo', resumen.total_tienda_tigo, 'bg-blue-600'),
+        ('tropigas', 'Tropigas', resumen.total_tropigas, 'bg-orange-700'),
         ('tecno-facil', 'Tecno Fácil', resumen.total_tecno_facil, 'bg-red-500'),
         ('la-curacao', 'La Curacao', resumen.total_la_curacao, 'bg-yellow-600'),
         ('tienda-claro', 'Claro', resumen.total_tienda_claro, 'bg-rose-600'),
@@ -396,6 +401,9 @@
           'epa': 'bg-yellow-500',
           'novex': 'bg-orange-600',
           'intelaf': 'bg-amber-500',
+          'office-depot': 'bg-red-700',
+          'tienda-tigo': 'bg-blue-600',
+          'tropigas': 'bg-orange-700',
           'tecno-facil': 'bg-red-500',
           'la-curacao': 'bg-yellow-600',
           'tienda-claro': 'bg-rose-600',
@@ -588,12 +596,12 @@
         </a>
       </section>
 
-      <!-- Roadmap Banner: Siguientes 3 Tiendas Prioritarias -->
+      <!-- Roadmap Banner: 21 Tiendas Activas en v5.1 -->
       {% if siguientes_tiendas %}
       <div class="mt-6 rounded-2xl border border-gray-200/80 bg-white px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500">
         <div class="flex items-center gap-2">
-          <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 font-semibold">Roadmap v5.0</span>
-          <span>18 tiendas activas en Neon DB · Próximas 3 tiendas listas en esqueleto:</span>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Consolidación v5.1</span>
+          <span>21 tiendas activas en Neon DB (incluyendo Tigo, Office Depot y Tropigas) · Siguientes en cola:</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           {% for st in siguientes_tiendas %}
@@ -605,6 +613,82 @@
         </div>
       </div>
       {% endif %}
+
+      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente) -->
+      <section id="faq" class="mt-14 pt-10 border-t border-gray-200/80">
+        <div class="max-w-4xl mx-auto">
+          <div class="text-center mb-8">
+            <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold tracking-wide uppercase">
+              Transparencia Total · 100% Gratuito
+            </span>
+            <h2 class="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-950">
+              Preguntas Frecuentes (FAQ)
+            </h2>
+            <p class="mt-2 text-sm text-gray-500">
+              Todo lo que necesitas saber sobre cómo comparamos precios reales en Guatemala sin letra pequeña.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="rounded-2xl border border-gray-200/90 bg-white p-5">
+              <h3 class="text-sm font-bold text-gray-950">
+                1. ¿Qué es tecHunter GT y tiene algún costo usarlo?
+              </h3>
+              <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                <strong>tecHunter GT es un comparador de precios 100% gratuito</strong> para el consumidor guatemalteco. No cobramos suscripción, no inflamos precios ni aplicamos comisiones de cobro directo por buscar o comparar productos.
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200/90 bg-white p-5">
+              <h3 class="text-sm font-bold text-gray-950">
+                2. ¿Compro directamente dentro de tecHunter GT?
+              </h3>
+              <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                No. Nosotros nunca pedimos datos de tu tarjeta ni procesamos pagos. Cuando eliges la mejor oferta y haces clic en <strong>“Ir a la tienda”</strong>, te llevamos directo al sitio web oficial de la tienda (iStore, EPA, Intelaf, Tienda Tigo, Office Depot, Tropigas, Kemik, Pacifiko, etc.) para que compres con total seguridad.
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200/90 bg-white p-5">
+              <h3 class="text-sm font-bold text-gray-950">
+                3. ¿Cómo calculan el “Precio Final con Envío” y el ahorro?
+              </h3>
+              <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                Muchas veces un producto parece más barato en una tienda, pero el envío lo encarece. Nuestro motor suma automáticamente la tarifa logística estimada de cada cadena en Guatemala y compara <strong>únicamente el mismo modelo y gama</strong> para mostrarte tu ahorro real en Quetzales (GTQ).
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200/90 bg-white p-5">
+              <h3 class="text-sm font-bold text-gray-950">
+                4. ¿Cada cuánto se actualizan los precios de las 21 tiendas?
+              </h3>
+              <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                Nuestro motor automatizado sincroniza periódicamente el catálogo de alta demanda en Guatemala hacia <strong>Neon DB</strong>. Así tus búsquedas cargan en milisegundos sin tiempos de espera ni pantallas congeladas.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Disclaimer / Aviso Legal Corporativo -->
+      <section id="aviso-legal" class="mt-8">
+        <div class="rounded-2xl border border-gray-200/80 bg-[#F5F5F7]/80 p-5 sm:p-6 text-[11px] sm:text-xs text-gray-500 leading-relaxed space-y-2">
+          <div class="flex items-center gap-2 text-gray-800 font-semibold">
+            <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+            </svg>
+            <span>Aviso Legal y Disclaimer Corporativo — tecHunter GT</span>
+          </div>
+          <p>
+            <strong>Naturaleza del Servicio:</strong> tecHunter GT es una plataforma informativa e independiente de comparación de precios en la República de Guatemala. No somos una tienda en línea ni actuamos como intermediarios financieros o agentes de cobro de los comercios listados.
+          </p>
+          <p>
+            <strong>Exactitud de Precios y Disponibilidad:</strong> Los precios en Quetzales (GTQ), existencias, promociones de membresía y costos de envío se recopilan de forma automatizada con fines referenciales y pueden variar sin previo aviso en el portal oficial de cada comercio. El precio final vinculante será siempre el reflejado en la pasarela de pago oficial de la tienda seleccionada al momento de la compra.
+          </p>
+          <p>
+            <strong>Propiedad Intelectual:</strong> Todas las marcas comerciales, nombres de tiendas (incluyendo pero no limitado a iStore, EPA, Novex, Intelaf, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Tiendas Max, Pacifiko, Kemik, Siman, Cemaco, Walmart, Paiz, Maxi Despensa, Elektra y La Torre), logotipos e imágenes de productos son propiedad exclusiva de sus respectivos titulares y se muestran únicamente con fines identificativos y comparativos.
+          </p>
+        </div>
+      </section>
     </section>
   </main>
 
@@ -612,15 +696,19 @@
   <footer class="border-t border-gray-200/80 bg-white py-6 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.0</span>
+        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.1</span>
         <span>·</span>
-        <span>Lectura Instantánea Neon DB + Analítica Web</span>
+        <span>Comparador Gratuito de Precios en Guatemala · 21 Tiendas en Neon DB</span>
       </div>
       <div class="flex flex-wrap items-center gap-4">
+        <a href="#faq" class="hover:text-gray-900 transition-colors">Preguntas Frecuentes (FAQ)</a>
+        <a href="#aviso-legal" class="hover:text-gray-900 transition-colors">Aviso Legal</a>
         <a href="https://ztechgt.com" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 transition-colors">Z-Tech Imports GT</a>
         <a href="https://novaviventiatravel.com" target="_blank" rel="noopener noreferrer" class="hover:text-gray-900 transition-colors">Nova Viventia Travel</a>
-        <a href="/api/analytics/summary" target="_blank" class="hover:text-gray-900 font-mono transition-colors">Analytics JSON</a>
-        <a href="/api/seed-status" target="_blank" class="hover:text-gray-900 font-mono transition-colors">Seed & Worker Status</a>
+        {% if es_admin %}
+        <a href="/api/analytics/summary" target="_blank" class="text-emerald-700 hover:text-emerald-900 font-mono font-semibold transition-colors">🔒 Analytics JSON</a>
+        <a href="/api/seed-status" target="_blank" class="text-emerald-700 hover:text-emerald-900 font-mono font-semibold transition-colors">🔒 Seed Status</a>
+        {% endif %}
       </div>
     </div>
   </footer>

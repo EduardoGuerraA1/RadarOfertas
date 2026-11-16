@@ -1,13 +1,13 @@
 """
-Capa de Interfaces (Web / API) de tecHunter GT v5.0 con FastAPI + Jinja2.
+Capa de Interfaces (Web / API) de tecHunter GT v5.1 con FastAPI + Jinja2.
 
-Arquitectura v5.0:
+Arquitectura v5.1 (Consolidación y Analítica Privada):
+  - 21 tiendas activas en Guatemala (incorporando Tienda Tigo GT, Office Depot GT y Tropigas).
   - El buscador web (`GET /` y `GET /api/ofertas`) lee ÚNICAMENTE de Neon DB en milisegundos.
-  - Cálculo de ahorro 100% verificado por producto idéntico/comparable (con tope lógico comercial),
-    eliminando sumatorias o restas entre artículos distintos del catálogo.
-  - Telemetría y Analítica Web ligera integrada (`/api/analytics/event` y `/api/analytics/summary`)
-    compatible con Google Analytics 4 (`gtag.js`).
-  - Esqueletos listos para las siguientes 3 tiendas prioritarias: Tienda Tigo GT, Office Depot GT y Tropigas.
+  - Cálculo de ahorro 100% verificado por producto idéntico/comparable (con tope lógico comercial).
+  - Analítica Web blindada: descarta automáticamente pings de mantenimiento/bots (UptimeRobot, etc.)
+    y oculta el panel de métricas al público general, habilitándolo únicamente mediante
+    `?admin=secreto` (o `ADMIN_ANALYTICS_TOKEN`) o cookie de sesión de administrador.
 """
 from __future__ import annotations
 
@@ -26,7 +26,11 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from radar_ofertas.application.use_cases.analitica_web import gestor_analitica
+from radar_ofertas.application.use_cases.analitica_web import (
+    COOKIE_ADMIN_NAME,
+    es_token_admin_valido,
+    gestor_analitica,
+)
 from radar_ofertas.application.use_cases.worker_precarga import (
     ESTADO_WORKER_PRECARGA,
     iniciar_worker_periodico_background,
@@ -73,7 +77,7 @@ async def lifespan(app_instance: FastAPI):
             )
         )
         logger.info(
-            "Worker en segundo plano de tecHunter GT v5.0 programado exitosamente."
+            "Worker en segundo plano de tecHunter GT v5.1 programado exitosamente."
         )
     try:
         yield
@@ -83,12 +87,12 @@ async def lifespan(app_instance: FastAPI):
 
 
 app = FastAPI(
-    title="tecHunter GT v5.0 — Comparador Instantáneo en Guatemala",
+    title="tecHunter GT v5.1 — Comparador Instantáneo en Guatemala",
     description=(
-        "Plataforma de comparación de precios en milisegundos respaldada por Neon DB, "
-        "Analítica Web en tiempo real y Worker de Precarga Inteligente."
+        "Plataforma de comparación de precios en milisegundos respaldada por Neon DB "
+        "(21 tiendas activas en Guatemala, Analítica Privada y Worker en Segundo Plano)."
     ),
-    version="5.0.0",
+    version="5.1.0",
     lifespan=lifespan,
 )
 
@@ -173,11 +177,11 @@ STOPWORDS_COMPARACION: frozenset[str] = frozenset(
     }
 )
 
-# Registro de esqueletos de la siguiente fase (Top 3 Prioridad v5.0)
-SCRAPERS_FASE_SIGUIENTE: dict[str, Any] = {
-    "tienda-tigo": TigoScraper(habilitado=False),
-    "office-depot": OfficeDepotScraper(habilitado=False),
-    "tropigas": TropigasScraper(habilitado=False),
+# Scrapers de la ola v5.1 ahora 100% activos en producción
+SCRAPERS_NUEVOS_ACTIVOS_V5_1: dict[str, Any] = {
+    "tienda-tigo": TigoScraper(habilitado=True),
+    "office-depot": OfficeDepotScraper(habilitado=True),
+    "tropigas": TropigasScraper(habilitado=True),
 }
 
 
@@ -195,11 +199,24 @@ class AnalyticsEventRequest(BaseModel):
     precio_gtq: float = 0.0
 
 
+def _verificar_acceso_admin(request: Request, admin_param: str = "") -> bool:
+    """
+    Determina si la petición actual cuenta con privilegios de administrador
+    vía query string (`?admin=secreto`), cookie de sesión (`techunter_admin`)
+    o cabecera HTTP (`X-Admin-Token`).
+    """
+    if es_token_admin_valido(admin_param):
+        return True
+    cookie_val = request.cookies.get(COOKIE_ADMIN_NAME)
+    if es_token_admin_valido(cookie_val):
+        return True
+    header_val = request.headers.get("X-Admin-Token")
+    if es_token_admin_valido(header_val):
+        return True
+    return False
+
+
 def _es_busqueda_computo_ztech(query: str, categoria_ui: str = "") -> bool:
-    """
-    Determina si la búsqueda o categoría activa pertenece al vertical de cómputo,
-    laptops, workstations o hardware especializado para destacar Z-Tech Imports GT.
-    """
     if categoria_ui.strip().lower() == "computo":
         return True
     q_lower = (query or "").strip().lower()
@@ -261,10 +278,6 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
 
 
 def _extraer_tokens_comparables(titulo: str) -> set[str]:
-    """
-    Extrae tokens alfanuméricos significativos de un título para identificar si dos
-    ofertas corresponden exactamente al mismo producto o modelo comercial.
-    """
     limpio = (titulo or "").lower().strip()
     descompuesto = unicodedata.normalize("NFD", limpio)
     sin_tildes = "".join(c for c in descompuesto if unicodedata.category(c) != "Mn")
@@ -279,11 +292,6 @@ def _extraer_tokens_comparables(titulo: str) -> set[str]:
 def _son_mismo_articulo_comparable(
     oferta_base: dict[str, Any], oferta_candidata: dict[str, Any]
 ) -> bool:
-    """
-    Verifica estrictamente si dos ofertas representan el MISMO producto comercial
-    para comparar sus precios entre tiendas, evitando comparar un artículo de Q4
-    con otro de Q49,000.
-    """
     p_base = float(oferta_base.get("precio_gtq") or 0.0)
     p_cand = float(oferta_candidata.get("precio_gtq") or 0.0)
     if p_base <= 0 or p_cand <= 0:
@@ -292,37 +300,31 @@ def _son_mismo_articulo_comparable(
     p_min = min(p_base, p_cand)
     p_max = max(p_base, p_cand)
 
-    # Regla comercial 1: El mismo producto entre tiendas en Guatemala no difiere en más de 65%
     if p_max > p_min * 1.65:
         return False
 
-    # Regla comercial 2: Misma categoría y misma gama
     if oferta_base.get("categoria_ui") != oferta_candidata.get("categoria_ui"):
         return False
     if oferta_base.get("gama_slug") != oferta_candidata.get("gama_slug"):
         return False
 
-    # Si comparten el mismo producto_id en base de datos, es el mismo artículo
     if (
         oferta_base.get("producto_id")
         and oferta_base.get("producto_id") == oferta_candidata.get("producto_id")
     ):
         return True
 
-    # Si ambos tienen una clave_modelo específica (ej. 'macbook-air-m2', 'dcd776', 'g29')
     clave_b = str(oferta_base.get("clave_modelo") or "")
     clave_c = str(oferta_candidata.get("clave_modelo") or "")
     if clave_b and clave_b == clave_c and ":" not in clave_b:
         return True
 
-    # Comparación por coincidencia estricta de tokens de marca + modelo/capacidad
     tokens_b = _extraer_tokens_comparables(str(oferta_base.get("titulo") or ""))
     tokens_c = _extraer_tokens_comparables(str(oferta_candidata.get("titulo") or ""))
     if not tokens_b or not tokens_c:
         return False
 
     comunes = tokens_b & tokens_c
-    # Exigir al menos 3 tokens significativos en común (o >= 60% del título más corto)
     min_requeridos = max(3, int(min(len(tokens_b), len(tokens_c)) * 0.6))
     return len(comunes) >= min_requeridos
 
@@ -330,14 +332,6 @@ def _son_mismo_articulo_comparable(
 def _calcular_ahorro_preciso(
     ofertas: list[dict[str, Any]], query: str = ""
 ) -> float:
-    """
-    Calcula el ahorro real por artículo (`oferta['ahorro_gtq']`) y el ahorro destacado
-    del comparador (`resumen['ahorro_maximo_gtq']`) garantizando:
-      1. Que solo se resten precios del MISMO artículo o modelo directo (`_son_mismo_articulo_comparable`).
-      2. Que el ahorro de un producto nunca supere un tope lógico comercial (`<= 55%` del precio
-         del producto y `<= Q2,500.00`), erradicando por completo sumatorias fantasma o ahorros
-         absurdos (como Q49,085 en un producto de Q4.25).
-    """
     if not ofertas:
         return 0.0
 
@@ -365,13 +359,10 @@ def _calcular_ahorro_preciso(
             tope_logico = min(precio_actual * 0.55, 2500.00)
             oferta["ahorro_gtq"] = round(min(diferencia_bruta, tope_logico), 2)
 
-    # El ahorro de la Mejor Oferta (#1) tiene prioridad si existe comparación directa
     ahorro_mejor_oferta = float(ofertas[0].get("ahorro_gtq") or 0.0)
     if ahorro_mejor_oferta > 0:
         return ahorro_mejor_oferta
 
-    # Si hay una búsqueda específica (ej. 'volante logitech', 'taladro dewalt'), evaluar
-    # el mejor ahorro verificado entre artículos idénticos dentro de los resultados
     ahorros_verificados = [
         float(o.get("ahorro_gtq") or 0.0)
         for o in ofertas
@@ -412,9 +403,12 @@ def _calcular_resumen(
             "total_epa": 0,
             "total_novex": 0,
             "total_intelaf": 0,
+            "total_office_depot": 0,
             "total_tecno_facil": 0,
             "total_la_curacao": 0,
+            "total_tropigas": 0,
             "total_tienda_claro": 0,
+            "total_tienda_tigo": 0,
             "total_pricesmart": 0,
             "total_siman": 0,
             "total_elektra": 0,
@@ -445,14 +439,23 @@ def _calcular_resumen(
         "total_epa": sum(1 for o in ofertas if o["tienda_slug"] == "epa"),
         "total_novex": sum(1 for o in ofertas if o["tienda_slug"] == "novex"),
         "total_intelaf": sum(1 for o in ofertas if o["tienda_slug"] == "intelaf"),
+        "total_office_depot": sum(
+            1 for o in ofertas if o["tienda_slug"] == "office-depot"
+        ),
         "total_tecno_facil": sum(
             1 for o in ofertas if o["tienda_slug"] in {"tecno-facil", "tecnofacil"}
         ),
         "total_la_curacao": sum(
             1 for o in ofertas if o["tienda_slug"] == "la-curacao"
         ),
+        "total_tropigas": sum(
+            1 for o in ofertas if o["tienda_slug"] == "tropigas"
+        ),
         "total_tienda_claro": sum(
             1 for o in ofertas if o["tienda_slug"] == "tienda-claro"
+        ),
+        "total_tienda_tigo": sum(
+            1 for o in ofertas if o["tienda_slug"] == "tienda-tigo"
         ),
         "total_pricesmart": sum(
             1 for o in ofertas if o["tienda_slug"] == "pricesmart"
@@ -482,10 +485,6 @@ def _calcular_resumen(
 async def _ejecutar_scraper_seguro(
     scraper: Any, nombre_tienda: str, termino: str, timeout_s: float = 12.0
 ) -> tuple[list[OfertaLocal], str | None]:
-    """
-    Ejecuta un scraper con timeout estricto y captura cualquier excepción
-    para garantizar que un fallo o bloqueo nunca rompa el flujo asíncrono.
-    """
     try:
         ofertas = await asyncio.wait_for(
             scraper.buscar_producto(termino), timeout=timeout_s
@@ -503,17 +502,19 @@ async def _ejecutar_scraper_seguro(
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
-    """Endpoint de salud para el balanceador de Render."""
-    return {"status": "ok", "service": "tecHunter", "version": "5.0.0"}
+    """Endpoint de salud para el balanceador de Render y UptimeRobot."""
+    return {"status": "ok", "service": "tecHunter", "version": "5.1.0"}
 
 
 @app.post("/api/analytics/event")
 async def api_registrar_evento_analitica(
+    request: Request,
     payload: AnalyticsEventRequest,
 ) -> dict[str, Any]:
     """
-    Registra un evento de analítica web de visitantes (pageview, search, outbound_click, house_ad_click).
+    Registra un evento de analítica web descartando automáticamente bots y monitores.
     """
+    ua = request.headers.get("user-agent", "")
     evento = gestor_analitica.registrar_evento(
         tipo=payload.tipo,
         query=payload.query,
@@ -521,38 +522,60 @@ async def api_registrar_evento_analitica(
         titulo=payload.titulo,
         url_destino=payload.url_destino,
         precio_gtq=payload.precio_gtq,
+        user_agent=ua,
     )
-    return {"status": "ok", "evento": evento}
+    return {
+        "status": "ok" if evento is not None else "ignored_bot",
+        "evento": evento,
+    }
 
 
 @app.get("/api/analytics/summary")
-async def api_resumen_analitica() -> dict[str, Any]:
+async def api_resumen_analitica(
+    request: Request,
+    admin: str = Query(
+        default="",
+        description="Token secreto de administrador (ej. ?admin=secreto) o cookie de sesión",
+    ),
+) -> dict[str, Any]:
     """
-    Devuelve las métricas acumuladas de visitas totales, términos más buscados y clics
-    salientes en 'Ir a la tienda' y anuncios del holding.
+    Endpoint PRIVADO de analítica web.
+    Solo accesible para el administrador mediante `?admin=secreto` (o `ADMIN_ANALYTICS_TOKEN`),
+    cookie `techunter_admin` o cabecera `X-Admin-Token`.
     """
+    if not _verificar_acceso_admin(request, admin_param=admin):
+        raise HTTPException(
+            status_code=403,
+            detail="Acceso privado restringido al administrador de tecHunter GT.",
+        )
     return gestor_analitica.obtener_resumen()
 
 
 @app.get("/api/seed-status")
-async def api_seed_status() -> dict[str, Any]:
+async def api_seed_status(
+    request: Request,
+    admin: str = Query(default=""),
+) -> dict[str, Any]:
     """
-    Expone el estado del Worker de Precarga Inteligente, el conteo de productos de
-    `seed_list_guatemala`, los esqueletos de la siguiente fase y el cruce de `tiendas_ecommerce_guatemala`.
+    Expone el estado del Worker de Precarga Inteligente y el cruce de las 21 tiendas activas.
+    Las métricas de analítica solo se incluyen si la petición está autenticada como admin.
     """
     cruce = cruzar_matriz_tiendas_y_prioridades()
     todos_seed = obtener_todos_los_productos_semilla()
-    return {
-        "version": "5.0.0",
+    es_admin = _verificar_acceso_admin(request, admin_param=admin)
+    respuesta: dict[str, Any] = {
+        "version": "5.1.0",
         "total_productos_semilla": len(todos_seed),
         "categorias_semilla": {
             cat: len(items) for cat, items in seed_list_guatemala.items()
         },
-        "scrapers_fase_siguiente_esqueletos": list(SCRAPERS_FASE_SIGUIENTE.keys()),
+        "scrapers_recien_activados_v5_1": list(SCRAPERS_NUEVOS_ACTIVOS_V5_1.keys()),
         "worker_precarga": ESTADO_WORKER_PRECARGA,
         "matriz_tiendas": cruce,
-        "analitica_resumen": gestor_analitica.obtener_resumen(top_n=5),
     }
+    if es_admin:
+        respuesta["analitica_resumen"] = gestor_analitica.obtener_resumen(top_n=10)
+    return respuesta
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -561,7 +584,7 @@ async def vista_comparador(
     q: str = Query(default="", description="Término de búsqueda en Neon DB"),
     tienda: str = Query(
         default="",
-        description="Filtro por tienda: istore, epa, novex, intelaf, tecno-facil, la-curacao, tienda-claro, pricesmart, siman, elektra, walmart, paiz, maxi-despensa, cemaco, pacifiko, la-torre, tiendas-max o kemik",
+        description="Filtro por tienda: istore, epa, novex, intelaf, office-depot, tecno-facil, la-curacao, tropigas, tienda-claro, tienda-tigo, pricesmart, siman, elektra, walmart, paiz, maxi-despensa, cemaco, pacifiko, la-torre, tiendas-max o kemik",
     ),
     cat: str = Query(
         default="",
@@ -575,13 +598,29 @@ async def vista_comparador(
         default="final",
         description="Criterio de ordenamiento: 'final' (precio con envío) o 'base' (precio de lista)",
     ),
+    admin: str = Query(
+        default="",
+        description="Token privado de administrador para visualizar métricas (ej. ?admin=secreto)",
+    ),
 ) -> HTMLResponse:
     error_db: str | None = None
     ofertas_totales: list[dict[str, Any]] = []
 
     cat_limpia = cat.strip().lower()
+    ua = request.headers.get("user-agent", "")
     gestor_analitica.registrar_visita(
-        query=q, categoria=cat_limpia, tienda=tienda.strip().lower()
+        query=q,
+        categoria=cat_limpia,
+        tienda=tienda.strip().lower(),
+        user_agent=ua,
+        metodo_http=request.method,
+    )
+
+    quiere_logout_admin = admin.strip().lower() in {"logout", "off", "0"}
+    es_admin = (
+        False
+        if quiere_logout_admin
+        else _verificar_acceso_admin(request, admin_param=admin)
     )
 
     try:
@@ -631,7 +670,7 @@ async def vista_comparador(
     cruce_tiendas = cruzar_matriz_tiendas_y_prioridades()
     ga_measurement_id = os.environ.get("GA_MEASUREMENT_ID", "").strip()
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="index.html",
         context={
@@ -646,11 +685,30 @@ async def vista_comparador(
             "resumen": resumen,
             "destacar_ztech": destacar_ztech,
             "siguientes_tiendas": cruce_tiendas["siguientes_3_alta_prioridad"],
-            "visitas_totales": gestor_analitica.visitas_totales,
+            "es_admin": es_admin,
+            "visitas_totales": gestor_analitica.visitas_totales if es_admin else None,
+            "clics_salientes_totales": gestor_analitica.clics_salientes_totales
+            if es_admin
+            else None,
+            "pings_bots_ignorados": gestor_analitica.pings_bots_ignorados
+            if es_admin
+            else None,
             "ga_measurement_id": ga_measurement_id,
             "error_db": error_db,
         },
     )
+
+    if quiere_logout_admin:
+        response.delete_cookie(COOKIE_ADMIN_NAME)
+    elif es_token_admin_valido(admin):
+        response.set_cookie(
+            key=COOKIE_ADMIN_NAME,
+            value=admin.strip(),
+            max_age=60 * 60 * 24 * 30,
+            httponly=True,
+            samesite="lax",
+        )
+    return response
 
 
 @app.get("/api/ofertas")
@@ -686,11 +744,6 @@ async def api_listar_ofertas(
 
 @app.post("/api/escanear")
 async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
-    """
-    Endpoint asíncrono no bloqueante (v5.0):
-    Delega la actualización al Worker de Precarga en segundo plano (`asyncio.create_task`)
-    y responde de inmediato para evitar timeouts 502 en Render.
-    """
     termino = (payload.query or "").strip()
     if not termino:
         return JSONResponse(
@@ -712,7 +765,7 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         status_code=200,
         content={
             "status": "success",
-            "modo": "background_worker_v5",
+            "modo": "background_worker_v5_1",
             "nuevas_ofertas": 0,
             "query": termino,
             "categoria": categoria,
