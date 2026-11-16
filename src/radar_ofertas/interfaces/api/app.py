@@ -1,7 +1,11 @@
 """
-Capa de Interfaces (Web / API) de tecHunter GT v4.0 con FastAPI + Jinja2.
-Configurada para despliegue en la nube (Render / Railway) leyendo el puerto
-dinámico desde `os.environ.get("PORT", 8000)`.
+Capa de Interfaces (Web / API) de tecHunter GT v5.0 con FastAPI + Jinja2.
+
+Arquitectura v5.0 (Cero Timeouts 502 en Render):
+  - El buscador web (`GET /` y `GET /api/ofertas`) lee ÚNICAMENTE de Neon DB en milisegundos.
+  - La precarga y actualización de precios ocurre en segundo plano mediante `worker_precarga.py`
+    (tanto por CLI/cron como en el bucle asíncrono de `lifespan`), insertando en `historial_precios`
+    únicamente cuando `_obtener_ultimo_precio_registrado` detecta una variación real de precio.
 """
 from __future__ import annotations
 
@@ -9,6 +13,7 @@ import asyncio
 import logging
 import os
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -18,43 +23,66 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from radar_ofertas.application.use_cases.worker_precarga import (
+    ESTADO_WORKER_PRECARGA,
+    iniciar_worker_periodico_background,
+    precargar_termino_semilla,
+)
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
-from radar_ofertas.domain.services.filtro_relevancia import filtrar_ofertas_relevantes
+from radar_ofertas.domain.seed_data import (
+    cruzar_matriz_tiendas_y_prioridades,
+    obtener_todos_los_productos_semilla,
+    seed_list_guatemala,
+)
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
-from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
-from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
-from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
-from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
-from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
-from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
-from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
-from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
-from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
-from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
-from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
-from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
-from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilScraper
-from radar_ofertas.infrastructure.scrapers.tiendas_oficiales_scraper import (
-    TiendasOficialesScraper,
-)
-from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 logger = logging.getLogger("tecHunter.api")
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    """
+    Inicia de forma silenciosa y no bloqueante el Worker Periódico de Precarga en segundo plano
+    cuando `ENABLE_BACKGROUND_WORKER` está activo (por defecto `true` en producción).
+    """
+    habilitar_worker = (
+        os.environ.get("ENABLE_BACKGROUND_WORKER", "true").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+    tarea_worker: asyncio.Task | None = None
+    if habilitar_worker and (os.environ.get("DATABASE_URL") or "").strip():
+        tarea_worker = asyncio.create_task(
+            iniciar_worker_periodico_background(
+                intervalo_minutos=int(os.environ.get("WORKER_INTERVAL_MINUTES", "180")),
+                muestra_por_categoria=int(
+                    os.environ.get("WORKER_SAMPLE_PER_CATEGORY", "2")
+                ),
+                retardo_inicial_s=30.0,
+            )
+        )
+        logger.info(
+            "Worker en segundo plano de tecHunter GT v5.0 programado exitosamente."
+        )
+    try:
+        yield
+    finally:
+        if tarea_worker and not tarea_worker.done():
+            tarea_worker.cancel()
+
+
 app = FastAPI(
-    title="tecHunter GT v4.0 — Comparador de Precios en Guatemala",
+    title="tecHunter GT v5.0 — Comparador Instantáneo en Guatemala",
     description=(
-        "Plataforma de comparación de precios en tiempo real "
-        "(iStore, EPA, Novex, Intelaf, Tecno Fácil, La Curacao, Tienda Claro, "
-        "PriceSmart, Siman, Elektra, Walmart, Paiz, Maxi Despensa, Kemik, "
-        "Pacifiko, La Torre, Tiendas Max y Cemaco) respaldada por Neon DB."
+        "Plataforma de comparación de precios en milisegundos respaldada por Neon DB "
+        "y Worker de Precarga Inteligente sobre 18 tiendas activas en Guatemala."
     ),
-    version="4.0.0",
+    version="5.0.0",
+    lifespan=lifespan,
 )
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -136,6 +164,12 @@ def _detectar_categoria_por_query(query: str, categoria_explicita: str = "") -> 
         "pro plan",
         "whiskas",
         "croqueta",
+        "incaparina",
+        "cafe",
+        "arroz",
+        "frijol",
+        "aceite",
+        "leche",
     )
     if any(p in q_lower for p in palabras_mascotas):
         return "mascotas"
@@ -177,8 +211,13 @@ def _calcular_ahorro_preciso(ofertas: list[dict[str, Any]]) -> float:
 
     grupos: dict[str, list[float]] = defaultdict(list)
     for o in ofertas:
-        clave = str(o.get("clave_modelo") or f"{o.get('categoria_ui', 'general')}:{o.get('gama_slug', 'media')}")
-        grupos[clave].append(float(o.get("costo_real_gtq") or o.get("precio_gtq") or 0.0))
+        clave = str(
+            o.get("clave_modelo")
+            or f"{o.get('categoria_ui', 'general')}:{o.get('gama_slug', 'media')}"
+        )
+        grupos[clave].append(
+            float(o.get("costo_real_gtq") or o.get("precio_gtq") or 0.0)
+        )
 
     ahorros_por_grupo = [
         max(precios_g) - min(precios_g)
@@ -291,7 +330,7 @@ async def _ejecutar_scraper_seguro(
 ) -> tuple[list[OfertaLocal], str | None]:
     """
     Ejecuta un scraper con timeout estricto y captura cualquier excepción
-    para garantizar que un fallo o bloqueo nunca rompa el endpoint JSON.
+    para garantizar que un fallo o bloqueo nunca rompa el flujo asíncrono.
     """
     try:
         ofertas = await asyncio.wait_for(
@@ -311,7 +350,27 @@ async def _ejecutar_scraper_seguro(
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     """Endpoint de salud para el balanceador de Render."""
-    return {"status": "ok", "service": "tecHunter", "version": "4.0.0"}
+    return {"status": "ok", "service": "tecHunter", "version": "5.0.0"}
+
+
+@app.get("/api/seed-status")
+async def api_seed_status() -> dict[str, Any]:
+    """
+    Expone el estado del Worker de Precarga Inteligente, el conteo de productos de
+    `seed_list_guatemala` y el cruce automático de `tiendas_ecommerce_guatemala`
+    con las siguientes 3 tiendas de alta prioridad.
+    """
+    cruce = cruzar_matriz_tiendas_y_prioridades()
+    todos_seed = obtener_todos_los_productos_semilla()
+    return {
+        "version": "5.0.0",
+        "total_productos_semilla": len(todos_seed),
+        "categorias_semilla": {
+            cat: len(items) for cat, items in seed_list_guatemala.items()
+        },
+        "worker_precarga": ESTADO_WORKER_PRECARGA,
+        "matriz_tiendas": cruce,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -369,9 +428,13 @@ async def vista_comparador(
 
     orden_limpio = orden.strip().lower()
     if orden_limpio == "base":
-        ofertas_visibles.sort(key=lambda o: (o.get("precio_gtq", 0.0), o.get("costo_real_gtq", 0.0)))
+        ofertas_visibles.sort(
+            key=lambda o: (o.get("precio_gtq", 0.0), o.get("costo_real_gtq", 0.0))
+        )
     else:
-        ofertas_visibles.sort(key=lambda o: (o.get("costo_real_gtq", 0.0), o.get("precio_gtq", 0.0)))
+        ofertas_visibles.sort(
+            key=lambda o: (o.get("costo_real_gtq", 0.0), o.get("precio_gtq", 0.0))
+        )
 
     resumen = _calcular_resumen(ofertas_totales)
     resumen_visible = _calcular_resumen(ofertas_visibles)
@@ -379,6 +442,7 @@ async def vista_comparador(
     resumen["ahorro_maximo_gtq"] = resumen_visible["ahorro_maximo_gtq"]
 
     destacar_ztech = _es_busqueda_computo_ztech(q, cat_limpia)
+    cruce_tiendas = cruzar_matriz_tiendas_y_prioridades()
 
     return templates.TemplateResponse(
         request=request,
@@ -388,10 +452,13 @@ async def vista_comparador(
             "tienda_activa": tienda.lower().strip(),
             "categoria_activa": cat_limpia,
             "gama_activa": gama_limpia,
-            "orden_activo": orden_limpio if orden_limpio in {"final", "base"} else "final",
+            "orden_activo": orden_limpio
+            if orden_limpio in {"final", "base"}
+            else "final",
             "ofertas": ofertas_visibles,
             "resumen": resumen,
             "destacar_ztech": destacar_ztech,
+            "siguientes_tiendas": cruce_tiendas["siguientes_3_alta_prioridad"],
             "error_db": error_db,
         },
     )
@@ -402,7 +469,9 @@ async def api_listar_ofertas(
     q: str = Query(default="", description="Término de búsqueda"),
     tienda: str = Query(default="", description="Filtro opcional de tienda"),
     cat: str = Query(default="", description="Filtro opcional de categoría UI"),
-    gama: str = Query(default="", description="Filtro opcional de gama: profesional, media, entrada"),
+    gama: str = Query(
+        default="", description="Filtro opcional de gama: profesional, media, entrada"
+    ),
 ) -> dict[str, Any]:
     try:
         repositorio = PostgresOfertaRepository()
@@ -429,205 +498,41 @@ async def api_listar_ofertas(
 @app.post("/api/escanear")
 async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
     """
-    Ejecuta todos los scrapers v4.0 en paralelo con aislamiento de fallos, timeouts
-    individuales y el Motor de Precisión de Modelos. Devuelve SIEMPRE un JSON
-    estructurado (`status`, `nuevas_ofertas`) para evitar errores de parseo.
+    Endpoint asíncrono no bloqueante (v5.0):
+    Para erradicar cualquier error 502 por timeout en Render, delega la actualización
+    al Worker de Precarga en segundo plano (`asyncio.create_task`) y responde de inmediato.
     """
-    try:
-        termino = (payload.query or "").strip()
-        if not termino:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "status": "error",
-                    "nuevas_ofertas": 0,
-                    "detail": "Debes indicar un término de búsqueda.",
-                },
-            )
-
-        categoria = _detectar_categoria_por_query(termino, payload.categoria)
-
-        kemik_scraper = KemikScraper(headless=True)
-        pacifiko_scraper = PacifikoScraper()
-        super_scraper = SuperScraper()
-        max_scraper = MaxScraper(
-            headless=True, timeout_s=8, usar_playwright_fallback=False
-        )
-        tecnofacil_scraper = TecnoFacilScraper(
-            headless=True, timeout_s=8, usar_playwright_fallback=False
-        )
-        cemaco_scraper = CemacoScraper(timeout_s=10)
-        walmart_scraper = WalmartScraper(timeout_s=10)
-        oficiales_scraper = TiendasOficialesScraper(timeout_s=10)
-        pricesmart_scraper = PriceSmartScraper(timeout_s=10)
-        intelaf_scraper = IntelafScraper(headless=True, timeout_s=8)
-        lacuracao_scraper = LaCuracaoScraper(timeout_s=10)
-        claro_scraper = ClaroScraper(timeout_s=10)
-        istore_scraper = IStoreScraper(timeout_s=10)
-        epa_scraper = EpaScraper(timeout_s=10)
-        novex_scraper = NovexScraper(timeout_s=10)
-
-        resultados = await asyncio.gather(
-            _ejecutar_scraper_seguro(kemik_scraper, "Kemik", termino, timeout_s=8.0),
-            _ejecutar_scraper_seguro(
-                pacifiko_scraper, "Pacifiko", termino, timeout_s=12.0
-            ),
-            _ejecutar_scraper_seguro(
-                super_scraper, "La Torre", termino, timeout_s=12.0
-            ),
-            _ejecutar_scraper_seguro(
-                max_scraper, "Tiendas Max", termino, timeout_s=8.0
-            ),
-            _ejecutar_scraper_seguro(
-                tecnofacil_scraper, "Tecno Fácil", termino, timeout_s=8.0
-            ),
-            _ejecutar_scraper_seguro(cemaco_scraper, "Cemaco", termino, timeout_s=12.0),
-            _ejecutar_scraper_seguro(
-                walmart_scraper, "Grupo Walmart", termino, timeout_s=14.0
-            ),
-            _ejecutar_scraper_seguro(
-                oficiales_scraper,
-                "Oficiales (Siman/Elektra/iShop)",
-                termino,
-                timeout_s=14.0,
-            ),
-            _ejecutar_scraper_seguro(
-                pricesmart_scraper, "PriceSmart", termino, timeout_s=12.0
-            ),
-            _ejecutar_scraper_seguro(
-                intelaf_scraper, "Intelaf", termino, timeout_s=10.0
-            ),
-            _ejecutar_scraper_seguro(
-                lacuracao_scraper, "La Curacao", termino, timeout_s=12.0
-            ),
-            _ejecutar_scraper_seguro(
-                claro_scraper, "Tienda Claro", termino, timeout_s=12.0
-            ),
-            _ejecutar_scraper_seguro(
-                istore_scraper, "iStore", termino, timeout_s=10.0
-            ),
-            _ejecutar_scraper_seguro(
-                epa_scraper, "EPA", termino, timeout_s=12.0
-            ),
-            _ejecutar_scraper_seguro(
-                novex_scraper, "Novex", termino, timeout_s=10.0
-            ),
-        )
-
-        (ofertas_kemik, err_kemik) = resultados[0]
-        (ofertas_pacifiko, err_pacifiko) = resultados[1]
-        (ofertas_super, err_super) = resultados[2]
-        (ofertas_max, err_max) = resultados[3]
-        (ofertas_tecnofacil, err_tecnofacil) = resultados[4]
-        (ofertas_cemaco, err_cemaco) = resultados[5]
-        (ofertas_walmart, err_walmart) = resultados[6]
-        (ofertas_oficiales, err_oficiales) = resultados[7]
-        (ofertas_pricesmart, err_pricesmart) = resultados[8]
-        (ofertas_intelaf, err_intelaf) = resultados[9]
-        (ofertas_lacuracao, err_lacuracao) = resultados[10]
-        (ofertas_claro, err_claro) = resultados[11]
-        (ofertas_istore, err_istore) = resultados[12]
-        (ofertas_epa, err_epa) = resultados[13]
-        (ofertas_novex, err_novex) = resultados[14]
-
-        advertencias = [
-            err
-            for err in (
-                err_kemik,
-                err_pacifiko,
-                err_super,
-                err_max,
-                err_tecnofacil,
-                err_cemaco,
-                err_walmart,
-                err_oficiales,
-                err_pricesmart,
-                err_intelaf,
-                err_lacuracao,
-                err_claro,
-                err_istore,
-                err_epa,
-                err_novex,
-            )
-            if err is not None
-        ]
-
-        unificadas_brutas = [
-            *ofertas_istore,
-            *ofertas_epa,
-            *ofertas_novex,
-            *ofertas_kemik,
-            *ofertas_pacifiko,
-            *ofertas_super,
-            *ofertas_max,
-            *ofertas_tecnofacil,
-            *ofertas_cemaco,
-            *ofertas_walmart,
-            *ofertas_oficiales,
-            *ofertas_pricesmart,
-            *ofertas_intelaf,
-            *ofertas_lacuracao,
-            *ofertas_claro,
-        ]
-        unificadas = [
-            o
-            for o in filtrar_ofertas_relevantes(unificadas_brutas, termino)
-            if o.precio_gtq > 0 and o.estado_precio_membresia != "oculto_requiere_login"
-        ]
-        descartados_ruido = len(unificadas_brutas) - len(unificadas)
-
-        insertados = 0
-        error_db: str | None = None
-        if unificadas:
-            try:
-                repositorio = PostgresOfertaRepository()
-                insertados = await asyncio.to_thread(
-                    repositorio.guardar_ofertas, unificadas, categoria
-                )
-            except Exception as db_exc:
-                logger.error("Error guardando ofertas en Neon DB: %s", db_exc)
-                error_db = str(db_exc)
-                advertencias.append(f"Neon DB: {error_db}")
-
+    termino = (payload.query or "").strip()
+    if not termino:
         return JSONResponse(
-            status_code=200,
-            content={
-                "status": "success" if error_db is None else "partial",
-                "nuevas_ofertas": insertados,
-                "evaluados_relevantes": len(unificadas),
-                "descartados_ruido": descartados_ruido,
-                "query": termino,
-                "categoria": categoria,
-                "extraidos_istore": len(ofertas_istore),
-                "extraidos_epa": len(ofertas_epa),
-                "extraidos_novex": len(ofertas_novex),
-                "extraidos_kemik": len(ofertas_kemik),
-                "extraidos_pacifiko": len(ofertas_pacifiko),
-                "extraidos_la_torre": len(ofertas_super),
-                "extraidos_tiendas_max": len(ofertas_max),
-                "extraidos_tecno_facil": len(ofertas_tecnofacil),
-                "extraidos_cemaco": len(ofertas_cemaco),
-                "extraidos_walmart": len(ofertas_walmart),
-                "extraidos_oficiales": len(ofertas_oficiales),
-                "extraidos_pricesmart": len(ofertas_pricesmart),
-                "extraidos_intelaf": len(ofertas_intelaf),
-                "extraidos_la_curacao": len(ofertas_lacuracao),
-                "extraidos_tienda_claro": len(ofertas_claro),
-                "insertados_neon": insertados,
-                "advertencias": advertencias,
-            },
-        )
-    except Exception as unexpected_error:
-        logger.exception("Error inesperado en POST /api/escanear: %s", unexpected_error)
-        return JSONResponse(
-            status_code=200,
+            status_code=400,
             content={
                 "status": "error",
                 "nuevas_ofertas": 0,
-                "insertados_neon": 0,
-                "detail": f"Error controlado en el servidor: {unexpected_error}",
+                "detail": "Debes indicar un término de búsqueda.",
             },
         )
+
+    categoria = _detectar_categoria_por_query(termino, payload.categoria)
+    asyncio.create_task(
+        precargar_termino_semilla(
+            termino=termino, categoria_db=categoria, persistir_en_db=True
+        )
+    )
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "success",
+            "modo": "background_worker_v5",
+            "nuevas_ofertas": 0,
+            "query": termino,
+            "categoria": categoria,
+            "detail": (
+                "Tarea encolada en el Worker en Segundo Plano; "
+                "el buscador web consulta directamente Neon DB en milisegundos."
+            ),
+        },
+    )
 
 
 if __name__ == "__main__":
