@@ -1,11 +1,14 @@
 """
-Caso de Uso / Background Worker de Precarga Inteligente (tecHunter GT v5.0).
+Caso de Uso / Background Worker de Precarga Inteligente (tecHunter GT v5.2).
 
 Barre de forma automática, silenciosa y resiliente los productos de `seed_list_guatemala`
-en las 18 tiendas activas de Guatemala, aplicando el Motor de Precisión de Modelos
-y persistiendo en Neon DB bajo la regla estricta de ahorro de almacenamiento:
+en las 24 tiendas activas de Guatemala (incluyendo Kemik, Intelaf, Rech, Click Guatemala y Tera),
+aplicando el Motor de Precisión de Modelos y persistiendo en Neon DB bajo la regla estricta
+de ahorro de almacenamiento:
   - `PostgresOfertaRepository.guardar_ofertas` valida mediante `_obtener_ultimo_precio_registrado`
     que SOLO se inserte un registro en `historial_precios` cuando el precio realmente varió.
+  - Programación automática multi-ciclo: al menos 3 veces al día (cada 8 horas / 480 minutos)
+    para capturar fluctuaciones de stock y ofertas flash de Kemik, Intelaf, Rech, Click y Tera.
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
 )
 from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
+from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
 from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
@@ -36,8 +40,10 @@ from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
+from radar_ofertas.infrastructure.scrapers.rech_scraper import RechScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
 from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilScraper
+from radar_ofertas.infrastructure.scrapers.tera_scraper import TeraScraper
 from radar_ofertas.infrastructure.scrapers.tiendas_oficiales_scraper import (
     TiendasOficialesScraper,
 )
@@ -47,10 +53,25 @@ from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 logger = logging.getLogger("tecHunter.worker_precarga")
 
+# Frecuencia oficial v5.2: mínimo 3 sincronizaciones diarias (cada 8 horas = 480 minutos)
+CICLOS_DIARIOS_MINIMOS: int = 3
+INTERVALO_HORAS_DEFAULT: int = 8
+INTERVALO_MINUTOS_DEFAULT: int = INTERVALO_HORAS_DEFAULT * 60  # 480 minutos
+VENTANAS_SINCRONIZACION_GT: tuple[str, ...] = (
+    "06:00 GT (Corte Matutino)",
+    "14:00 GT (Corte Mediodía / Ofertas Flash)",
+    "22:00 GT (Corte Nocturno)",
+)
+
 ESTADO_WORKER_PRECARGA: dict[str, Any] = {
     "activo": False,
+    "frecuencia_diaria_ciclos": CICLOS_DIARIOS_MINIMOS,
+    "intervalo_horas": INTERVALO_HORAS_DEFAULT,
+    "intervalo_minutos": INTERVALO_MINUTOS_DEFAULT,
+    "ventanas_programadas_gt": list(VENTANAS_SINCRONIZACION_GT),
     "ultimo_ciclo_inicio": None,
     "ultimo_ciclo_fin": None,
+    "proximo_ciclo_programado": None,
     "termino_actual": None,
     "productos_procesados_ciclo": 0,
     "ofertas_evaluadas_ciclo": 0,
@@ -74,11 +95,13 @@ def seleccionar_lote_semilla(
     categoria_filtro: str = "",
     muestra_por_categoria: int = 0,
     limite_total: int = 0,
+    ciclo_offset: int = 0,
 ) -> list[tuple[str, str, str]]:
     """
     Construye la cola de ejecución `(categoria_seed, categoria_db, termino)` desde `seed_list_guatemala`.
-    - Si `muestra_por_categoria > 0`, selecciona los primeros N productos de cada categoría
-      para lograr cobertura transversal rápida en las 5 categorías.
+    - Si `muestra_por_categoria > 0`, selecciona `muestra_por_categoria` productos de cada categoría
+      (rotando por `ciclo_offset` cuando se ejecuta en los 3 turnos diarios) para lograr cobertura
+      transversal rápida en las 5 categorías.
     """
     cola: list[tuple[str, str, str]] = []
     cat_filtro_limpio = categoria_filtro.strip().lower()
@@ -87,11 +110,16 @@ def seleccionar_lote_semilla(
         if cat_filtro_limpio and cat_seed.lower() != cat_filtro_limpio:
             continue
         cat_db = MAPEO_CATEGORIA_SEED_A_DB.get(cat_seed, "tecnologia")
-        seleccionados = (
-            lista_terminos[:muestra_por_categoria]
-            if muestra_por_categoria > 0
-            else lista_terminos
-        )
+        if muestra_por_categoria > 0 and lista_terminos:
+            total_cat = len(lista_terminos)
+            inicio = (ciclo_offset * muestra_por_categoria) % total_cat
+            seleccionados = [
+                lista_terminos[(inicio + i) % total_cat]
+                for i in range(min(muestra_por_categoria, total_cat))
+            ]
+        else:
+            seleccionados = list(lista_terminos)
+
         for termino in seleccionados:
             cola.append((cat_seed, cat_db, termino))
 
@@ -108,14 +136,25 @@ async def precargar_termino_semilla(
     timeout_scraper_s: float = 10.0,
 ) -> dict[str, Any]:
     """
-    Ejecuta en paralelo los 21 scrapers activos para un término de `seed_list_guatemala`,
-    filtra con el Motor de Precisión y guarda únicamente cambios reales de precio en Neon DB.
+    Ejecuta en paralelo los scrapers ligeros de las 24 tiendas activas (incluyendo Intelaf, Rech,
+    Click Guatemala y Tera) para un término de `seed_list_guatemala`, filtra con el Motor de
+    Precisión y guarda únicamente cambios reales de precio en Neon DB.
     """
     scrapers: list[tuple[str, Any]] = [
         ("iStore", IStoreScraper(timeout_s=int(timeout_scraper_s))),
         ("EPA", EpaScraper(timeout_s=int(timeout_scraper_s))),
         ("Novex", NovexScraper(timeout_s=int(timeout_scraper_s))),
-        ("Intelaf", IntelafScraper(headless=True, timeout_s=int(timeout_scraper_s))),
+        (
+            "Intelaf",
+            IntelafScraper(
+                headless=True,
+                timeout_s=int(timeout_scraper_s),
+                usar_playwright_fallback=False,
+            ),
+        ),
+        ("Rech", RechScraper(timeout_s=int(timeout_scraper_s))),
+        ("Click Guatemala", ClickScraper(timeout_s=int(timeout_scraper_s))),
+        ("Tera", TeraScraper(timeout_s=int(timeout_scraper_s))),
         ("Office Depot", OfficeDepotScraper(timeout_s=int(timeout_scraper_s))),
         (
             "Tecno Fácil",
@@ -183,14 +222,16 @@ async def ejecutar_ciclo_precarga(
     limite_total: int = 0,
     pausa_entre_productos_s: float = 0.8,
     persistir_en_db: bool = True,
+    ciclo_offset: int = 0,
 ) -> dict[str, Any]:
     """
-    Ejecuta un barrido completo o por lote sobre `seed_list_guatemala`.
+    Ejecuta un barrido completo o por lote rotativo sobre `seed_list_guatemala`.
     """
     cola = seleccionar_lote_semilla(
         categoria_filtro=categoria_filtro,
         muestra_por_categoria=muestra_por_categoria,
         limite_total=limite_total,
+        ciclo_offset=ciclo_offset,
     )
 
     ESTADO_WORKER_PRECARGA["activo"] = True
@@ -210,7 +251,7 @@ async def ejecutar_ciclo_precarga(
     detalles: list[dict[str, Any]] = []
 
     logger.info(
-        "Iniciando ciclo de precarga inteligente tecHunter v5.0 (%d términos semilla en cola)...",
+        "Iniciando ciclo de precarga inteligente tecHunter v5.2 (%d términos semilla en cola, 3x/día)...",
         len(cola),
     )
 
@@ -268,33 +309,56 @@ async def ejecutar_ciclo_precarga(
         "productos_procesados": len(detalles),
         "ofertas_relevantes_evaluadas": total_evaluadas,
         "nuevos_precios_insertados": total_insertados,
+        "frecuencia_diaria_ciclos": ESTADO_WORKER_PRECARGA["frecuencia_diaria_ciclos"],
+        "intervalo_horas": ESTADO_WORKER_PRECARGA["intervalo_horas"],
         "siguientes_3_tiendas_prioritarias": cruce_tiendas["siguientes_3_alta_prioridad"],
         "detalles": detalles,
     }
 
 
+def calcular_intervalo_sincronizacion_minutos(intervalo_solicitado_min: int = INTERVALO_MINUTOS_DEFAULT) -> int:
+    """
+    Garantiza que el intervalo de sincronización automática ejecute al menos 3 ciclos al día
+    (máximo cada 8 horas = 480 minutos, mínimo 30 minutos).
+    """
+    return max(30, min(int(intervalo_solicitado_min), INTERVALO_MINUTOS_DEFAULT))
+
+
 async def iniciar_worker_periodico_background(
-    intervalo_minutos: int = 180,
-    muestra_por_categoria: int = 2,
-    retardo_inicial_s: float = 25.0,
+    intervalo_minutos: int = INTERVALO_MINUTOS_DEFAULT,
+    muestra_por_categoria: int = 3,
+    retardo_inicial_s: float = 45.0,
 ) -> None:
     """
-    Bucle asíncrono no bloqueante diseñado para ejecutarse en segundo plano dentro
-    del ciclo de vida de FastAPI en Render, manteniendo fresca la base de datos de Neon
-    sin afectar la latencia de respuesta web (<50ms).
+    Orquestador asíncrono en segundo plano configurado para ejecutar la sincronización de precios
+    al menos 3 veces al día de forma automática (cada 8 horas / 480 minutos por defecto),
+    capturando fluctuaciones de stock y ofertas flash de Kemik, Intelaf, Rech, Click y Tera.
     """
+    intervalo_efectivo_min = calcular_intervalo_sincronizacion_minutos(intervalo_minutos)
+    ciclos_por_dia = max(CICLOS_DIARIOS_MINIMOS, round(1440 / intervalo_efectivo_min))
+    ESTADO_WORKER_PRECARGA["intervalo_minutos"] = intervalo_efectivo_min
+    ESTADO_WORKER_PRECARGA["intervalo_horas"] = round(intervalo_efectivo_min / 60, 1)
+    ESTADO_WORKER_PRECARGA["frecuencia_diaria_ciclos"] = ciclos_por_dia
+
     await asyncio.sleep(retardo_inicial_s)
+    ciclo_idx = 0
     while True:
         try:
             await ejecutar_ciclo_precarga(
                 muestra_por_categoria=muestra_por_categoria,
                 pausa_entre_productos_s=2.0,
                 persistir_en_db=True,
+                ciclo_offset=ciclo_idx,
             )
+            ciclo_idx += 1
         except asyncio.CancelledError:
             logger.info("Worker periódico de precarga detenido limpiamente.")
             break
         except Exception as exc:
             logger.warning("Excepción controlada en bucle periódico de precarga: %s", exc)
 
-        await asyncio.sleep(max(60, intervalo_minutos * 60))
+        proximo_dt = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+            minutes=intervalo_efectivo_min
+        )
+        ESTADO_WORKER_PRECARGA["proximo_ciclo_programado"] = proximo_dt.isoformat()
+        await asyncio.sleep(intervalo_efectivo_min * 60)

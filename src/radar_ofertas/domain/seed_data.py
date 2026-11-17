@@ -53,6 +53,29 @@ seed_list_guatemala: dict[str, list[str]] = {
         "Impresora HP Smart Tank 580",
         "Disco Solido SSD Kingston NV2 1TB",
         "Memoria RAM DDR4 16GB laptop",
+        # Mousepads Gamer y Profesionales (v5.2)
+        "Mousepad Gamer Logitech G840 XL",
+        "Mousepad Gamer HyperX Fury S Pro XL",
+        "Mousepad Gamer Razer Gigantus V2 Large",
+        "Mousepad Gamer Corsair MM300 Pro Extendido",
+        "Mousepad Redragon Flick XL",
+        # Teclados Mecánicos (v5.2)
+        "Teclado Mecanico Logitech G Pro X TKL",
+        "Teclado Mecanico Redragon Kumara K552 RGB",
+        "Teclado Mecanico HyperX Alloy Origins Core",
+        "Teclado Mecanico Razer BlackWidow V4",
+        "Teclado Mecanico Keychron K2 Wireless",
+        # Diademas Gamer / Headsets (v5.2)
+        "Diadema Gamer HyperX Cloud III",
+        "Diadema Gamer Logitech G733 Lightspeed Wireless",
+        "Diadema Gamer Logitech G435 Bluetooth",
+        "Diadema Gamer Razer BlackShark V2 X",
+        "Diadema Gamer Redragon Zeus X H510",
+        # Webcams Streaming y Oficina (v5.2)
+        "Webcam Logitech C920s Pro Full HD 1080p",
+        "Webcam Logitech Brio 4K Ultra HD",
+        "Webcam Logitech C270 HD",
+        "Webcam Razer Kiyo X Full HD",
     ],
     "smartphones": [
         # Apple iPhone
@@ -133,6 +156,16 @@ seed_list_guatemala: dict[str, list[str]] = {
         "Licuadora Oster reversible",
         "Cafetera Oster 12 tazas",
         "Aspiradora robot Xiaomi",
+        # Cámaras de Seguridad para el Hogar / Smart Home (v5.2)
+        "Camara de seguridad TP-Link Tapo C200 360 WiFi",
+        "Camara de seguridad TP-Link Tapo C210 2K 3MP",
+        "Camara de seguridad exterior TP-Link Tapo C310",
+        "Camara de seguridad exterior TP-Link Tapo C500 360",
+        "Camara de seguridad Ezviz C6N 1080p 360 Smart",
+        "Camara de seguridad exterior Ezviz H8C 2K Pan Tilt",
+        "Camara de seguridad exterior Ezviz C3TN Color Night",
+        "Camara de seguridad Xiaomi Smart Camera C300 2K",
+        "Camara de seguridad Nexxt Solutions Smart WiFi",
     ],
     "herramientas_y_ferreteria": [
         # Taladros y Rotomartillos
@@ -299,8 +332,13 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
         },
         {
             "nombre": "Rech Guatemala",
-            "url": "https://rech.com.gt",
-            "verticales": ["computo", "gaming"],
+            "url": "https://www.rech.com.gt",
+            "verticales": ["computo", "gaming", "perifericos"],
+        },
+        {
+            "nombre": "Tera Guatemala",
+            "url": "https://www.tera.gt",
+            "verticales": ["computo", "gaming", "componentes"],
         },
         {
             "nombre": "Spirit Computación",
@@ -422,7 +460,7 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
     ],
 }
 
-# Las 21 tiendas actualmente operativas en tecHunter GT v5.1 (con su slug en Neon DB)
+# Las 24 tiendas actualmente operativas en tecHunter GT v5.2 (con su slug en Neon DB)
 TIENDAS_OPERATIVAS_TECHUNTER: tuple[dict[str, str], ...] = (
     {"slug": "tiendas-max", "nombre": "Tiendas Max", "alias_matriz": "Max Distelsa", "url": "https://www.max.com.gt"},
     {"slug": "tecno-facil", "nombre": "Tecno Fácil", "alias_matriz": "Tecno Fácil (Grupo Distelsa)", "url": "https://www.tecnofacil.com.gt"},
@@ -434,6 +472,9 @@ TIENDAS_OPERATIVAS_TECHUNTER: tuple[dict[str, str], ...] = (
     {"slug": "la-curacao", "nombre": "La Curacao", "alias_matriz": "La Curacao", "url": "https://www.lacuracaonline.com/guatemala"},
     {"slug": "tropigas", "nombre": "Tropigas", "alias_matriz": "Tropigas", "url": "https://www.almacenestropigas.com/guatemala"},
     {"slug": "intelaf", "nombre": "Intelaf", "alias_matriz": "Intelaf", "url": "https://www.intelaf.com"},
+    {"slug": "rech", "nombre": "Rech", "alias_matriz": "Rech Guatemala", "url": "https://www.rech.com.gt"},
+    {"slug": "click", "nombre": "Click Guatemala", "alias_matriz": "Click Guatemala", "url": "https://www.click.gt"},
+    {"slug": "tera", "nombre": "Tera", "alias_matriz": "Tera Guatemala", "url": "https://www.tera.gt"},
     {"slug": "office-depot", "nombre": "Office Depot", "alias_matriz": "Office Depot Guatemala", "url": "https://www.officedepot.com.gt"},
     {"slug": "istore", "nombre": "iStore", "alias_matriz": "iShop Guatemala", "url": "https://ishop.gt"},
     {"slug": "ishop", "nombre": "iShop", "alias_matriz": "iShop Guatemala", "url": "https://ishop.gt"},
@@ -472,9 +513,9 @@ def obtener_todos_los_productos_semilla() -> list[tuple[str, str, str]]:
 
 def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     """
-    Cruza automáticamente `tiendas_ecommerce_guatemala` con las 21 tiendas operativas
-    de tecHunter GT v5.1 (incluyendo las recién activadas Tienda Tigo Guatemala,
-    Office Depot Guatemala y Tropigas) e identifica las siguientes tiendas en el backlog.
+    Cruza automáticamente `tiendas_ecommerce_guatemala` con las 24 tiendas operativas
+    de tecHunter GT v5.2 (incluyendo los especialistas en cómputo Rech Guatemala,
+    Click Guatemala y Tera Guatemala) e identifica las siguientes tiendas en el backlog.
     """
     nombres_operativos_norm = {
         t["alias_matriz"].strip().lower() for t in TIENDAS_OPERATIVAS_TECHUNTER
@@ -491,6 +532,9 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
         "lacuracaonline.com",
         "almacenestropigas.com",
         "intelaf.com",
+        "rech.com.gt",
+        "click.gt",
+        "tera.gt",
         "officedepot.com.gt",
         "ishop.gt",
         "claro.com.gt",
@@ -561,11 +605,16 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     siguientes_3_alta_prioridad = tiendas_pendientes[:3]
 
     return {
-        "total_operativas_sistema": 21,
+        "total_operativas_sistema": 24,
         "tiendas_recien_activadas_v5_1": [
             "Tienda Tigo Guatemala",
             "Office Depot Guatemala",
             "Tropigas",
+        ],
+        "tiendas_recien_activadas_v5_2": [
+            "Rech Guatemala",
+            "Click Guatemala",
+            "Tera Guatemala",
         ],
         "total_catalogo_matriz": len(tiendas_activas_en_matriz) + len(tiendas_pendientes),
         "operativas_cruzadas": tiendas_activas_en_matriz,

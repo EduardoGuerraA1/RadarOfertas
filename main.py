@@ -1,6 +1,9 @@
 """
-Punto de entrada principal (Orquestador) de tecHunter GT v5.1 / RadarOfertas.
-Coordina la ejecución concurrente de los 21 scrapers locales en Guatemala:
+Punto de entrada principal (Orquestador) de tecHunter GT v5.2 / RadarOfertas.
+Coordina la ejecución concurrente de los 24 scrapers locales en Guatemala:
+  - Rech Guatemala (rech.com.gt)
+  - Click Guatemala (click.gt)
+  - Tera Guatemala (tera.gt)
   - Tienda Tigo GT (tienda.tigo.com.gt)
   - Office Depot GT (officedepot.com.gt)
   - Almacenes Tropigas GT (almacenestropigas.com/guatemala)
@@ -42,6 +45,7 @@ from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
 )
 from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
+from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
 from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
@@ -52,8 +56,10 @@ from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
 from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartScraper
+from radar_ofertas.infrastructure.scrapers.rech_scraper import RechScraper
 from radar_ofertas.infrastructure.scrapers.super_scraper import SuperScraper
 from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilScraper
+from radar_ofertas.infrastructure.scrapers.tera_scraper import TeraScraper
 from radar_ofertas.infrastructure.scrapers.tiendas_oficiales_scraper import (
     TiendasOficialesScraper,
 )
@@ -110,6 +116,9 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
         "microondas",
         "estufa",
         "hogar",
+        "tapo",
+        "ezviz",
+        "camara de seguridad",
     )
     if any(p in q_lower for p in palabras_hogar):
         return "hogar"
@@ -120,8 +129,8 @@ def _detectar_categoria(query: str, categoria_arg: str) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Orquestador principal de tecHunter GT v5.1 "
-            "(21 tiendas activas incluyendo Tigo, Office Depot, Tropigas, iStore, EPA y Novex)."
+            "Orquestador principal de tecHunter GT v5.2 "
+            "(24 tiendas activas incluyendo Rech, Click Guatemala, Tera, Tigo, Office Depot y Tropigas)."
         )
     )
     parser.add_argument(
@@ -210,9 +219,12 @@ def mostrar_comparativa_en_consola(
     todas_ordenadas = sorted(relevantes, key=lambda o: o.precio_gtq)
 
     print("\n" + "=" * 110)
-    print(f" RADAR COMPARADOR TECHUNTER GT v5.1 (21 TIENDAS) | Búsqueda: '{termino}'")
+    print(f" RADAR COMPARADOR TECHUNTER GT v5.2 (24 TIENDAS) | Búsqueda: '{termino}'")
     print(
         f" Resumen: "
+        f"Rech ({sum(1 for o in todas_ordenadas if o.tienda == 'Rech')}) | "
+        f"Click ({sum(1 for o in todas_ordenadas if o.tienda == 'Click Guatemala')}) | "
+        f"Tera ({sum(1 for o in todas_ordenadas if o.tienda == 'Tera')}) | "
         f"Tigo ({sum(1 for o in todas_ordenadas if o.tienda == 'Tienda Tigo')}) | "
         f"Office Depot ({sum(1 for o in todas_ordenadas if o.tienda == 'Office Depot')}) | "
         f"Tropigas ({sum(1 for o in todas_ordenadas if o.tienda == 'Tropigas')}) | "
@@ -296,9 +308,12 @@ async def ejecutar_orquestador() -> None:
     istore_scraper = IStoreScraper()
     epa_scraper = EpaScraper()
     novex_scraper = NovexScraper()
-    tigo_scraper = TigoScraper()
-    officedepot_scraper = OfficeDepotScraper()
-    tropigas_scraper = TropigasScraper()
+    tigo_scraper = TigoScraper(simular=args.simular)
+    officedepot_scraper = OfficeDepotScraper(simular=args.simular)
+    tropigas_scraper = TropigasScraper(simular=args.simular)
+    rech_scraper = RechScraper(simular=args.simular)
+    click_scraper = ClickScraper(simular=args.simular)
+    tera_scraper = TeraScraper(simular=args.simular)
 
     scrapers_en_vivo = [
         pacifiko_scraper.buscar_producto(termino),
@@ -317,6 +332,9 @@ async def ejecutar_orquestador() -> None:
         tigo_scraper.buscar_producto(termino),
         officedepot_scraper.buscar_producto(termino),
         tropigas_scraper.buscar_producto(termino),
+        rech_scraper.buscar_producto(termino),
+        click_scraper.buscar_producto(termino),
+        tera_scraper.buscar_producto(termino),
     ]
 
     if args.simular:

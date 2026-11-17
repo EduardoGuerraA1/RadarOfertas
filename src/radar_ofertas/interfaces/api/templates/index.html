@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>tecHunter GT v5.1 — El mejor precio. Ya calculado con envío.</title>
+  <title>tecHunter GT v5.2 — El mejor precio. Ya calculado con envío.</title>
   {% if ga_measurement_id %}
   <!-- Google Analytics 4 (GA4) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
@@ -64,7 +64,7 @@
 </head>
 <body class="min-h-screen flex flex-col selection:bg-emerald-500/15 selection:text-emerald-900">
 
-  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.1) -->
+  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.2) -->
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-gray-200/80">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       <!-- Brand -->
@@ -78,7 +78,7 @@
         </div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-base font-bold tracking-tight text-gray-950">tec<span class="text-emerald-600">Hunter</span></span>
-          <span class="text-xs font-medium text-gray-400">GT v5.1</span>
+          <span class="text-xs font-medium text-gray-400">GT v5.2</span>
         </div>
       </a>
 
@@ -86,7 +86,7 @@
       <div class="flex items-center gap-2 sm:gap-2.5">
         <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100/90 border border-gray-200/80 text-xs font-medium text-gray-700">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Neon DB · Lectura en ms</span>
+          <span>Neon DB · Sync 3x/día</span>
         </div>
         <div class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100/90 border border-gray-200/80 text-xs font-medium text-gray-700 tabular-nums">
           <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -116,14 +116,14 @@
     <section class="pt-10 pb-7 sm:pt-14 sm:pb-9 px-4 sm:px-6 lg:px-8 border-b border-gray-200/80">
       <div class="max-w-4xl mx-auto text-center">
         <p class="text-xs sm:text-sm font-medium text-gray-500 tracking-wide mb-3">
-          Comparador gratuito e instantáneo sobre Neon DB · 21 Tiendas en Guatemala
+          Comparador gratuito e instantáneo sobre Neon DB · 24 Tiendas en Guatemala
         </p>
         <h1 class="text-3xl sm:text-5xl lg:text-[54px] font-extrabold tracking-tight text-gray-950 leading-[1.08]">
           El mejor precio.<br />
           <span class="text-gray-400 font-bold">Ya calculado con envío.</span>
         </h1>
         <p class="mt-4 text-sm sm:text-base text-gray-500 max-w-2xl mx-auto leading-relaxed">
-          Consulta en milisegundos precios precargados de iStore, EPA, Novex, Intelaf, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Max, Pacifiko, Kemik, Siman, Walmart y Cemaco.
+          Consulta en milisegundos precios precargados de Rech, Click Guatemala, Tera, Intelaf, Kemik, iStore, EPA, Novex, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Max, Pacifiko, Siman, Walmart y Cemaco.
         </p>
 
         <!-- Search Bar Capsule (100% Instant Neon DB Read — Zero 502 Timeout Risk) -->
@@ -143,7 +143,7 @@
                 type="text"
                 name="q"
                 value="{{ query }}"
-                placeholder="Buscar MacBook Air M2, Taladro DeWalt, iPhone 16, Refrigeradora, Pedigree..."
+                placeholder="Buscar MacBook Air M2, Teclado Mecánico, Diadema HyperX, Cámara Tapo C200, Taladro..."
                 class="w-full bg-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400 focus:outline-none"
               />
               {% if query %}
@@ -175,7 +175,7 @@
         <!-- Quick Seed Search Suggestions -->
         <div class="mt-3.5 flex flex-wrap items-center justify-center gap-1.5 text-xs text-gray-500">
           <span class="text-gray-400">Búsquedas semilla populares:</span>
-          {% for sugerencia in ['MacBook', 'Laptop', 'iPhone', 'Samsung', 'Taladro', 'Refrigeradora', 'Pedigree'] %}
+          {% for sugerencia in ['MacBook', 'Teclado Mecánico', 'Diadema HyperX', 'Mousepad', 'Webcam', 'Tapo C200', 'Ezviz', 'iPhone', 'Taladro'] %}
           <a
             href="/?q={{ sugerencia | urlencode }}"
             class="px-2.5 py-0.5 rounded-full bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 font-medium transition-colors"
@@ -237,11 +237,11 @@
             {% if query %}
               Resultados para “{{ query }}”
             {% elif categoria_activa == 'computo' %}
-              Resultados para “Cómputo y Laptops”
+              Resultados para “Cómputo, Periféricos y Laptops”
             {% elif categoria_activa == 'smartphones' %}
               Resultados para “Smartphones”
             {% elif categoria_activa == 'hogar' %}
-              Resultados para “Línea Blanca y Hogar”
+              Resultados para “Línea Blanca, Hogar y Cámaras Smart”
             {% elif categoria_activa == 'herramientas' %}
               Resultados para “Herramientas y Ferretería”
             {% elif categoria_activa == 'super-mascotas' %}
@@ -300,12 +300,16 @@
         </div>
       </div>
 
-      <!-- Store Filter Pills with Live Stock Counters -->
+      <!-- Store Filter Pills with Live Stock Counters (24 Tiendas en v5.2) -->
       {% set filtros_tienda = [
+        ('rech', 'Rech', resumen.total_rech | default(0), 'bg-purple-600'),
+        ('click', 'Click GT', resumen.total_click | default(0), 'bg-cyan-600'),
+        ('tera', 'Tera', resumen.total_tera | default(0), 'bg-indigo-600'),
+        ('intelaf', 'Intelaf', resumen.total_intelaf, 'bg-amber-500'),
+        ('kemik', 'Kemik', resumen.total_kemik, 'bg-amber-600'),
         ('istore', 'iStore', resumen.total_istore, 'bg-gray-900'),
         ('epa', 'EPA', resumen.total_epa, 'bg-yellow-500'),
         ('novex', 'Novex', resumen.total_novex, 'bg-orange-600'),
-        ('intelaf', 'Intelaf', resumen.total_intelaf, 'bg-amber-500'),
         ('office-depot', 'Office Depot', resumen.total_office_depot, 'bg-red-700'),
         ('tienda-tigo', 'Tigo', resumen.total_tienda_tigo, 'bg-blue-600'),
         ('tropigas', 'Tropigas', resumen.total_tropigas, 'bg-orange-700'),
@@ -315,7 +319,6 @@
         ('pricesmart', 'PriceSmart', resumen.total_pricesmart, 'bg-blue-700'),
         ('tiendas-max', 'Max', resumen.total_tiendas_max, 'bg-orange-500'),
         ('pacifiko', 'Pacifiko', resumen.total_pacifiko, 'bg-sky-500'),
-        ('kemik', 'Kemik', resumen.total_kemik, 'bg-amber-600'),
         ('siman', 'Siman', resumen.total_siman, 'bg-rose-500'),
         ('cemaco', 'Cemaco', resumen.total_cemaco, 'bg-teal-600'),
         ('walmart', 'Walmart', resumen.total_walmart, 'bg-blue-500'),
@@ -339,7 +342,7 @@
         </a>
 
         {% for slug, etiqueta, cantidad, dot_color in filtros_tienda %}
-        {% set es_visible_inicial = loop.index <= 9 or tienda_activa == slug or cantidad > 0 %}
+        {% set es_visible_inicial = loop.index <= 10 or tienda_activa == slug or cantidad > 0 %}
         <a
           href="/?q={{ query | urlencode }}&tienda={{ slug }}&cat={{ categoria_activa }}&gama={{ gama_activa }}&orden={{ orden_activo }}"
           data-extra-store="{% if not es_visible_inicial %}true{% else %}false{% endif %}"
@@ -403,6 +406,9 @@
         {% set es_mejor_precio = (loop.index == 1) %}
         {% set ahorro_item = oferta.ahorro_gtq | default(0.0) %}
         {% set dot_tienda = {
+          'rech': 'bg-purple-600',
+          'click': 'bg-cyan-600',
+          'tera': 'bg-indigo-600',
           'istore': 'bg-gray-900',
           'ishop': 'bg-gray-900',
           'epa': 'bg-yellow-500',
@@ -615,12 +621,12 @@
         </a>
       </section>
 
-      <!-- Roadmap Banner: 21 Tiendas Activas en v5.1 -->
+      <!-- Roadmap Banner: 24 Tiendas Activas en v5.2 -->
       {% if siguientes_tiendas %}
       <div class="mt-6 rounded-2xl border border-gray-200/80 bg-white px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500">
         <div class="flex items-center gap-2">
-          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Consolidación v5.1</span>
-          <span>21 tiendas activas en Neon DB (incluyendo Tigo, Office Depot y Tropigas) · Siguientes en cola:</span>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Especialistas v5.2</span>
+          <span>24 tiendas activas en Neon DB (incorporando Rech, Click Guatemala y Tera · sync 3x/día) · Siguientes en cola:</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           {% for st in siguientes_tiendas %}
@@ -633,18 +639,18 @@
       </div>
       {% endif %}
 
-      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente) -->
+      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente — v5.2) -->
       <section id="faq" class="mt-14 pt-10 border-t border-gray-200/80">
         <div class="max-w-4xl mx-auto">
           <div class="text-center mb-8">
             <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold tracking-wide uppercase">
-              Transparencia Total · 100% Gratuito
+              Transparencia de Negocio · 100% Gratuito
             </span>
             <h2 class="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-950">
               Preguntas Frecuentes (FAQ)
             </h2>
             <p class="mt-2 text-sm text-gray-500">
-              Todo lo que necesitas saber sobre cómo comparamos precios reales en Guatemala sin letra pequeña.
+              Todo lo que necesitas saber sobre cómo comparamos precios reales en Guatemala y cómo se sostiene la plataforma sin cobrarte comisiones.
             </p>
           </div>
 
@@ -654,7 +660,7 @@
                 1. ¿Qué es tecHunter GT y tiene algún costo usarlo?
               </h3>
               <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
-                <strong>tecHunter GT es un comparador de precios 100% gratuito</strong> para el consumidor guatemalteco. No cobramos suscripción, no inflamos precios ni aplicamos comisiones de cobro directo por buscar o comparar productos.
+                <strong>tecHunter GT es un comparador de precios 100% gratuito</strong> para el consumidor guatemalteco. No cobramos suscripción, no inflamos precios ni aplicamos comisiones de cobro directo por buscar o comparar productos en las 24 tiendas indexadas.
               </p>
             </div>
 
@@ -663,7 +669,7 @@
                 2. ¿Compro directamente dentro de tecHunter GT?
               </h3>
               <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
-                No. Nosotros nunca pedimos datos de tu tarjeta ni procesamos pagos. Cuando eliges la mejor oferta y haces clic en <strong>“Ir a la tienda”</strong>, te llevamos directo al sitio web oficial de la tienda (iStore, EPA, Intelaf, Tienda Tigo, Office Depot, Tropigas, Kemik, Pacifiko, etc.) para que compres con total seguridad.
+                No. Nosotros nunca pedimos datos de tu tarjeta ni procesamos pagos. Cuando eliges la mejor oferta y haces clic en <strong>“Ir a la tienda”</strong>, te llevamos directo al sitio web oficial del comercio (Rech, Click Guatemala, Tera, Intelaf, Kemik, iStore, EPA, Tienda Tigo, Office Depot, Tropigas, Pacifiko, etc.) para que compres con total seguridad.
               </p>
             </div>
 
@@ -678,10 +684,23 @@
 
             <div class="rounded-2xl border border-gray-200/90 bg-white p-5">
               <h3 class="text-sm font-bold text-gray-950">
-                4. ¿Cada cuánto se actualizan los precios de las 21 tiendas?
+                4. ¿Cada cuánto se actualizan los precios de las 24 tiendas?
               </h3>
               <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
-                Nuestro motor automatizado sincroniza periódicamente el catálogo de alta demanda en Guatemala hacia <strong>Neon DB</strong>. Así tus búsquedas cargan en milisegundos sin tiempos de espera ni pantallas congeladas.
+                Nuestro worker automatizado en segundo plano ejecuta la sincronización de precios <strong>al menos 3 veces al día (cada 8 horas)</strong> hacia <strong>Neon DB</strong>. Así capturamos ofertas flash y fluctuaciones de stock en Kemik, Intelaf, Rech, Click o Tera manteniendo lecturas en milisegundos.
+              </p>
+            </div>
+
+            <!-- Pregunta 5 Destacada: Transparencia del Modelo de Negocio e Importación Especializada -->
+            <div class="md:col-span-2 rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/50 via-white to-[#F5F5F7] p-5 sm:p-6">
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 text-[11px] font-semibold mb-2">
+                <span>🤝 Transparencia de Negocio</span>
+              </div>
+              <h3 class="text-sm sm:text-base font-bold text-gray-950">
+                5. ¿Cómo se sostiene tecHunter GT de forma 100% gratuita para el usuario?
+              </h3>
+              <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                <strong>tecHunter GT nunca altera el orden de los precios ni cobra comisiones al comprador.</strong> La plataforma opera y se sostiene de forma gratuita gracias a su <strong>vínculo estratégico con servicios de importación especializada y soluciones corporativas de nuestro holding</strong>: cuando un profesional, gamer o empresa en Guatemala busca equipos de alto rendimiento, configuraciones a medida, GPUs o workstations que no tienen stock local o cuyo precio en retail es elevado, conectamos esa demanda con <strong>Z-Tech Imports GT (<a href="https://ztechgt.com" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline hover:text-emerald-900">ztechgt.com</a>)</strong> para importación directa bajo pedido con garantía local, así como con nuestra agencia hermana <strong>Nova Viventia Travel (<a href="https://novaviventiatravel.com" target="_blank" rel="noopener noreferrer" class="text-emerald-700 underline hover:text-emerald-900">novaviventiatravel.com</a>)</strong>. De esta manera, tú siempre obtienes datos imparciales y gratuitos, y nosotros financiamos la infraestructura tecnológica con servicios especializados de valor real.
               </p>
             </div>
           </div>
@@ -704,7 +723,7 @@
             <strong>Exactitud de Precios y Disponibilidad:</strong> Los precios en Quetzales (GTQ), existencias, promociones de membresía y costos de envío se recopilan de forma automatizada con fines referenciales y pueden variar sin previo aviso en el portal oficial de cada comercio. El precio final vinculante será siempre el reflejado en la pasarela de pago oficial de la tienda seleccionada al momento de la compra.
           </p>
           <p>
-            <strong>Propiedad Intelectual:</strong> Todas las marcas comerciales, nombres de tiendas (incluyendo pero no limitado a iStore, EPA, Novex, Intelaf, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Tiendas Max, Pacifiko, Kemik, Siman, Cemaco, Walmart, Paiz, Maxi Despensa, Elektra y La Torre), logotipos e imágenes de productos son propiedad exclusiva de sus respectivos titulares y se muestran únicamente con fines identificativos y comparativos.
+            <strong>Propiedad Intelectual:</strong> Todas las marcas comerciales, nombres de tiendas (incluyendo pero no limitado a Rech, Click Guatemala, Tera, iStore, EPA, Novex, Intelaf, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Tiendas Max, Pacifiko, Kemik, Siman, Cemaco, Walmart, Paiz, Maxi Despensa, Elektra y La Torre), logotipos e imágenes de productos son propiedad exclusiva de sus respectivos titulares y se muestran únicamente con fines identificativos y comparativos.
           </p>
         </div>
       </section>
@@ -715,9 +734,9 @@
   <footer class="border-t border-gray-200/80 bg-white py-6 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.1</span>
+        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.2</span>
         <span>·</span>
-        <span>Comparador Gratuito de Precios en Guatemala · 21 Tiendas en Neon DB</span>
+        <span>Comparador Gratuito de Precios en Guatemala · 24 Tiendas en Neon DB</span>
       </div>
       <div class="flex flex-wrap items-center gap-4">
         <a href="#faq" class="hover:text-gray-900 transition-colors">Preguntas Frecuentes (FAQ)</a>

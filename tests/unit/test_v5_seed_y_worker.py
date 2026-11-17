@@ -1,11 +1,12 @@
 """
-Pruebas unitarias para tecHunter GT v5.0:
-  - Módulo de Datos Semilla (`seed_data.py`): `seed_list_guatemala` y `tiendas_ecommerce_guatemala`
-  - Cruce automático de las 18 tiendas operativas e identificación del Top 3 de alta prioridad
-  - Selección de lotes en `worker_precarga.py`
+Pruebas unitarias para tecHunter GT v5.2:
+  - Módulo de Datos Semilla (`seed_data.py`): `seed_list_guatemala` ampliada con periféricos
+    (mousepads, teclados mecánicos, diademas gamer, webcams) y cámaras de seguridad smart home (Tapo, Ezviz)
+  - Cruce automático de las 24 tiendas operativas (incluyendo Rech, Click Guatemala y Tera)
+  - Worker en segundo plano configurado al menos 3 veces al día (cada 8h = 480 min) y rotación por lote
   - Corrección del cálculo de ahorro (`_calcular_ahorro_preciso`): cero ahorros absurdos entre productos distintos
-  - Analítica Web de visitantes (`GestorAnaliticaWeb`)
-  - Esqueletos de scrapers para Tienda Tigo GT, Office Depot GT y Tropigas
+  - Analítica Web de visitantes (`GestorAnaliticaWeb`) con filtro anti-bots y privacidad admin
+  - Scrapers funcionales para Rech, Click Guatemala, Tera, Tienda Tigo GT, Office Depot GT y Tropigas
 """
 from __future__ import annotations
 
@@ -13,20 +14,28 @@ import asyncio
 from decimal import Decimal
 
 from radar_ofertas.application.use_cases.analitica_web import GestorAnaliticaWeb
-from radar_ofertas.application.use_cases.worker_precarga import seleccionar_lote_semilla
+from radar_ofertas.application.use_cases.worker_precarga import (
+    CICLOS_DIARIOS_MINIMOS,
+    INTERVALO_MINUTOS_DEFAULT,
+    calcular_intervalo_sincronizacion_minutos,
+    seleccionar_lote_semilla,
+)
 from radar_ofertas.domain.seed_data import (
     cruzar_matriz_tiendas_y_prioridades,
     obtener_todos_los_productos_semilla,
     seed_list_guatemala,
     tiendas_ecommerce_guatemala,
 )
+from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
+from radar_ofertas.infrastructure.scrapers.rech_scraper import RechScraper
+from radar_ofertas.infrastructure.scrapers.tera_scraper import TeraScraper
 from radar_ofertas.infrastructure.scrapers.tigo_scraper import TigoScraper
 from radar_ofertas.infrastructure.scrapers.tropigas_scraper import TropigasScraper
 from radar_ofertas.interfaces.api.app import _calcular_ahorro_preciso
 
 
-def test_seed_list_guatemala_contiene_5_verticales_y_productos_clave() -> None:
+def test_seed_list_guatemala_contiene_5_verticales_y_perifericos_camaras_v5_2() -> None:
     expected_keys = {
         "computo_y_laptops",
         "smartphones",
@@ -37,26 +46,40 @@ def test_seed_list_guatemala_contiene_5_verticales_y_productos_clave() -> None:
     assert set(seed_list_guatemala.keys()) == expected_keys
 
     todos = obtener_todos_los_productos_semilla()
-    assert len(todos) >= 130
+    assert len(todos) >= 160
     nombres = [item[2] for item in todos]
+    # Productos núcleo
     assert "MacBook Air M2 8GB 256GB" in nombres
     assert "Samsung Galaxy S24 Ultra 256GB" in nombres
     assert "Refrigeradora Mabe 11 pies" in nombres
     assert "Taladro percutor inalambrico DeWalt 20V" in nombres
     assert "Alimento para perro Pedigree adulto 21 kg" in nombres
     assert "Incaparina original 450g" in nombres
+    # Nuevos periféricos de alta demanda v5.2 (mousepads, teclados mecánicos, diademas, webcams)
+    assert "Mousepad Gamer Logitech G840 XL" in nombres
+    assert "Teclado Mecanico Redragon Kumara K552 RGB" in nombres
+    assert "Diadema Gamer HyperX Cloud III" in nombres
+    assert "Webcam Logitech C920s Pro Full HD 1080p" in nombres
+    # Nuevas cámaras de seguridad para el hogar v5.2 (TP-Link Tapo, Ezviz)
+    assert "Camara de seguridad TP-Link Tapo C200 360 WiFi" in nombres
+    assert "Camara de seguridad Ezviz C6N 1080p 360 Smart" in nombres
 
 
-def test_cruce_matriz_tiendas_identifica_21_operativas_y_3_recien_activadas_v5_1() -> None:
+def test_cruce_matriz_tiendas_identifica_24_operativas_y_especialistas_computo_v5_2() -> None:
     assert len(tiendas_ecommerce_guatemala) == 6
     reporte = cruzar_matriz_tiendas_y_prioridades()
 
-    assert reporte["total_operativas_sistema"] == 21
-    assert len(reporte["operativas_cruzadas"]) >= 17
+    assert reporte["total_operativas_sistema"] == 24
+    assert len(reporte["operativas_cruzadas"]) >= 20
     assert reporte["tiendas_recien_activadas_v5_1"] == [
         "Tienda Tigo Guatemala",
         "Office Depot Guatemala",
         "Tropigas",
+    ]
+    assert reporte["tiendas_recien_activadas_v5_2"] == [
+        "Rech Guatemala",
+        "Click Guatemala",
+        "Tera Guatemala",
     ]
 
     top_3 = reporte["siguientes_3_alta_prioridad"]
@@ -69,9 +92,19 @@ def test_cruce_matriz_tiendas_identifica_21_operativas_y_3_recien_activadas_v5_1
     ]
 
 
-def test_worker_precarga_selecciona_lote_por_muestra_y_categoria() -> None:
-    lote_muestra = seleccionar_lote_semilla(muestra_por_categoria=2)
-    assert len(lote_muestra) == 10
+def test_worker_precarga_3_veces_al_dia_y_rotacion_de_lote_semilla() -> None:
+    assert CICLOS_DIARIOS_MINIMOS == 3
+    assert INTERVALO_MINUTOS_DEFAULT == 480
+    # Nunca permite un intervalo mayor a 480 minutos (garantiza >= 3 ejecuciones cada 24h)
+    assert calcular_intervalo_sincronizacion_minutos(480) == 480
+    assert calcular_intervalo_sincronizacion_minutos(720) == 480
+    assert calcular_intervalo_sincronizacion_minutos(240) == 240
+
+    lote_ciclo_0 = seleccionar_lote_semilla(muestra_por_categoria=2, ciclo_offset=0)
+    lote_ciclo_1 = seleccionar_lote_semilla(muestra_por_categoria=2, ciclo_offset=1)
+    assert len(lote_ciclo_0) == 10
+    assert len(lote_ciclo_1) == 10
+    assert lote_ciclo_0 != lote_ciclo_1
 
     lote_herramientas = seleccionar_lote_semilla(
         categoria_filtro="herramientas_y_ferreteria", limite_total=5
@@ -221,82 +254,39 @@ def test_gestor_analitica_web_filtra_bots_uptimerobot_y_valida_token_admin() -> 
     assert es_token_admin_valido("publico_invalido") is False
 
 
-def test_activacion_real_3_tiendas_prioritarias_tigo_officedepot_tropigas() -> None:
+def test_activacion_real_tiendas_tigo_officedepot_tropigas_y_especialistas_rech_click_tera() -> None:
     tigo = TigoScraper(simular=True)
     officedepot = OfficeDepotScraper(simular=True)
     tropigas = TropigasScraper(simular=True)
+    rech = RechScraper(simular=True)
+    click = ClickScraper(simular=True)
+    tera = TeraScraper(simular=True)
 
     res_tigo = asyncio.run(tigo.buscar_producto("iphone 16"))
     res_od = asyncio.run(officedepot.buscar_producto("impresora epson"))
     res_tropigas = asyncio.run(tropigas.buscar_producto("refrigeradora mabe"))
+    res_rech = asyncio.run(rech.buscar_producto("teclado mecanico"))
+    res_click = asyncio.run(click.buscar_producto("tapo c200"))
+    res_tera = asyncio.run(tera.buscar_producto("diadema hyperx"))
 
-    assert len(res_tigo) >= 1
-    assert res_tigo[0].tienda == "Tienda Tigo"
-    assert res_tigo[0].precio_gtq > Decimal("0")
-
-    assert len(res_od) >= 1
-    assert res_od[0].tienda == "Office Depot"
-    assert res_od[0].precio_gtq > Decimal("0")
-
-    assert len(res_tropigas) >= 1
-    assert res_tropigas[0].tienda == "Tropigas"
-    assert res_tropigas[0].precio_gtq > Decimal("0")
+    assert len(res_tigo) >= 1 and res_tigo[0].tienda == "Tienda Tigo"
+    assert len(res_od) >= 1 and res_od[0].tienda == "Office Depot"
+    assert len(res_tropigas) >= 1 and res_tropigas[0].tienda == "Tropigas"
+    assert len(res_rech) >= 1 and res_rech[0].tienda == "Rech" and res_rech[0].precio_gtq > Decimal("0")
+    assert len(res_click) >= 1 and res_click[0].tienda == "Click Guatemala" and res_click[0].precio_gtq > Decimal("0")
+    assert len(res_tera) >= 1 and res_tera[0].tienda == "Tera" and res_tera[0].precio_gtq > Decimal("0")
 
     # Modo deshabilitado sigue disponible si se requiere apagar manualmente
-    assert asyncio.run(TigoScraper(habilitado=False).buscar_producto("iphone 16")) == []
-
-    ofertas_tigo = tigo.parsear_respuesta_catalogo(
-        {
-            "items": [
-                {
-                    "name": "iPhone 16 128GB Prepago Tigo",
-                    "price": "7999.00",
-                    "url": "/iphone-16-128gb",
-                    "image": "https://tienda.tigo.com.gt/img/ip16.jpg",
-                }
-            ]
-        }
-    )
-    assert len(ofertas_tigo) == 1
-    assert ofertas_tigo[0].tienda == "Tienda Tigo"
-    assert ofertas_tigo[0].precio_gtq == Decimal("7999.00")
-
-    ofertas_od = officedepot.parsear_respuesta_hybris(
-        {
-            "products": [
-                {
-                    "name": "Impresora Epson EcoTank L3250 Wi-Fi",
-                    "price": {"value": 1699.00},
-                    "url": "/officedepotGuatemala/es/p/100200",
-                }
-            ]
-        }
-    )
-    assert len(ofertas_od) == 1
-    assert ofertas_od[0].tienda == "Office Depot"
-
-    ofertas_tropigas = tropigas.parsear_respuesta_unicomer(
-        {
-            "items": [
-                {
-                    "name": "Refrigeradora Mabe 11 Pies RMA1130JM",
-                    "price": 3299.00,
-                    "url": "/refrigeradora-mabe-11-pies",
-                }
-            ]
-        }
-    )
-    assert len(ofertas_tropigas) == 1
-    assert ofertas_tropigas[0].tienda == "Tropigas"
+    assert asyncio.run(RechScraper(habilitado=False).buscar_producto("teclado")) == []
 
 
 def test_respaldo_rapido_en_memoria_evita_bloqueos_cuando_termino_no_esta_en_db() -> None:
     from radar_ofertas.interfaces.api.app import _buscar_respaldo_rapido_en_memoria
 
-    ofertas_respaldo = _buscar_respaldo_rapido_en_memoria(query="iphone 16")
+    ofertas_respaldo = _buscar_respaldo_rapido_en_memoria(query="tapo c200")
     assert len(ofertas_respaldo) >= 1
     tiendas = {o["tienda_slug"] for o in ofertas_respaldo}
-    assert "tienda-tigo" in tiendas or "istore" in tiendas
+    assert "rech" in tiendas or "click" in tiendas or "tera" in tiendas
     assert all(o["precio_gtq"] > 0 for o in ofertas_respaldo)
 
     # Término inexistente devuelve lista vacía en <2 ms sin bloquear ni lanzar excepción

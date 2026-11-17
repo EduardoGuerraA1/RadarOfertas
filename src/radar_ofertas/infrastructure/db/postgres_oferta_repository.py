@@ -152,6 +152,12 @@ class PostgresOfertaRepository(OfertaRepository):
         slug = "-".join(limpio.split())
         if slug == "tecnofacil":
             return "tecno-facil"
+        if slug in {"click-guatemala", "click-gt"}:
+            return "click"
+        if slug in {"rech-guatemala", "rech-gt"}:
+            return "rech"
+        if slug in {"tera-guatemala", "tera-gt"}:
+            return "tera"
         return slug
 
     @classmethod
@@ -171,6 +177,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "tienda-tigo": "https://tienda.tigo.com.gt",
             "office-depot": "https://www.officedepot.com.gt",
             "intelaf": "https://www.intelaf.com",
+            "rech": "https://www.rech.com.gt",
+            "click": "https://www.click.gt",
+            "tera": "https://www.tera.gt",
             "cemaco": "https://www.cemaco.com",
             "epa": "https://gt.epaenlinea.com",
             "novex": "https://www.novex.com.gt",
@@ -218,10 +227,10 @@ class PostgresOfertaRepository(OfertaRepository):
     @staticmethod
     def clasificar_categoria_ui(titulo: str, tienda_slug: str = "") -> str:
         """
-        Clasifica cualquier producto en una de las 5 Categorías Principales de tecHunter v4.0:
-          - 'computo'        -> 💻 Cómputo y Laptops
+        Clasifica cualquier producto en una de las 5 Categorías Principales de tecHunter v5.2:
+          - 'computo'        -> 💻 Cómputo y Laptops (incluye periféricos gamer, mousepads, teclados, diademas, webcams)
           - 'smartphones'    -> 📱 Smartphones
-          - 'hogar'          -> 🧊 Línea Blanca y Hogar
+          - 'hogar'          -> 🧊 Línea Blanca y Hogar (incluye cámaras de seguridad Smart Home Tapo/Ezviz)
           - 'herramientas'   -> 🔧 Herramientas
           - 'super-mascotas' -> 🧺 Supermercado y Mascotas
         """
@@ -309,6 +318,18 @@ class PostgresOfertaRepository(OfertaRepository):
         if any(
             k in t
             for k in (
+                "camara de seguridad",
+                "cámara de seguridad",
+                "tapo c",
+                "ezviz",
+                "nexxt",
+            )
+        ):
+            return "hogar"
+
+        if any(
+            k in t
+            for k in (
                 "laptop",
                 "notebook",
                 "portatil",
@@ -332,6 +353,15 @@ class PostgresOfertaRepository(OfertaRepository):
                 "ddr5",
                 "teclado",
                 "mouse",
+                "mousepad",
+                "diadema",
+                "headset",
+                "webcam",
+                "hyperx",
+                "razer",
+                "redragon",
+                "corsair",
+                "keychron",
                 "volante",
                 "g29",
                 "logitech",
@@ -346,7 +376,7 @@ class PostgresOfertaRepository(OfertaRepository):
                 "ipad",
                 "tablet",
             )
-        ) or s in {"intelaf", "office-depot"}:
+        ) or s in {"intelaf", "office-depot", "rech", "click", "tera"}:
             return "computo"
 
         if any(
@@ -394,6 +424,16 @@ class PostgresOfertaRepository(OfertaRepository):
         titulo_lower = titulo.lower()
         marcas_conocidas = [
             "Logitech",
+            "HyperX",
+            "Razer",
+            "Redragon",
+            "Corsair",
+            "Keychron",
+            "TP-Link",
+            "Tapo",
+            "Ezviz",
+            "Nexxt",
+            "Kingston",
             "Pedigree",
             "Purina",
             "Dog Chow",
@@ -401,8 +441,6 @@ class PostgresOfertaRepository(OfertaRepository):
             "Beneful",
             "Whiskas",
             "Ruccan",
-            "Redragon",
-            "Razer",
             "Sony",
             "PlayStation",
             "Samsung",
@@ -439,6 +477,8 @@ class PostgresOfertaRepository(OfertaRepository):
             "Dell",
             "Acer",
             "MSI",
+            "Epson",
+            "Canon",
             "RCA",
             "Garmin",
             "JBL",
@@ -660,6 +700,9 @@ class PostgresOfertaRepository(OfertaRepository):
             "tienda-tigo",
             "office-depot",
             "intelaf",
+            "rech",
+            "click",
+            "tera",
             "cemaco",
             "epa",
             "novex",

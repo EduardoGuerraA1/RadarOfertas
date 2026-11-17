@@ -1,8 +1,9 @@
 """
-Capa de Interfaces (Web / API) de tecHunter GT v5.1 con FastAPI + Jinja2.
+Capa de Interfaces (Web / API) de tecHunter GT v5.2 con FastAPI + Jinja2.
 
-Arquitectura v5.1 (Consolidación y Analítica Privada):
-  - 21 tiendas activas en Guatemala (incorporando Tienda Tigo GT, Office Depot GT y Tropigas).
+Arquitectura v5.2 (Especialistas de Cómputo, Periféricos/Cámaras y Worker 3x/Día):
+  - 24 tiendas activas en Guatemala (incorporando Rech, Click Guatemala y Tera junto a Tigo, Office Depot y Tropigas).
+  - Worker en Segundo Plano configurado para sincronizar al menos 3 veces al día (cada 8 horas / 480 min).
   - El buscador web (`GET /` y `GET /api/ofertas`) lee ÚNICAMENTE de Neon DB en milisegundos.
   - Cálculo de ahorro 100% verificado por producto idéntico/comparable (con tope lógico comercial).
   - Analítica Web blindada: descarta automáticamente pings de mantenimiento/bots (UptimeRobot, etc.)
@@ -34,6 +35,8 @@ from radar_ofertas.application.use_cases.analitica_web import (
 )
 from radar_ofertas.application.use_cases.worker_precarga import (
     ESTADO_WORKER_PRECARGA,
+    INTERVALO_MINUTOS_DEFAULT,
+    calcular_intervalo_sincronizacion_minutos,
     iniciar_worker_periodico_background,
     precargar_termino_semilla,
 )
@@ -50,12 +53,15 @@ from radar_ofertas.domain.services.filtro_relevancia import (
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
+from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
 from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
 from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
+from radar_ofertas.infrastructure.scrapers.rech_scraper import RechScraper
 from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilScraper
+from radar_ofertas.infrastructure.scrapers.tera_scraper import TeraScraper
 from radar_ofertas.infrastructure.scrapers.tigo_scraper import TigoScraper
 from radar_ofertas.infrastructure.scrapers.tropigas_scraper import TropigasScraper
 
@@ -70,8 +76,8 @@ async def lifespan(app_instance: FastAPI):
     """
     Mantiene el proceso web de Render 100% ligero y dedicado a lecturas en milisegundos
     sobre Neon DB (evitando 502 / lags por contención de CPU/RAM).
-    El Worker Periódico en segundo plano solo se inicia dentro del contenedor web si se
-    activa explícitamente con `ENABLE_BACKGROUND_WORKER=true`.
+    El Worker Periódico en segundo plano está configurado para ejecutarse al menos 3 veces al día
+    (cada 8 horas = 480 minutos por defecto) cuando se habilita con `ENABLE_BACKGROUND_WORKER=true`.
     """
     habilitar_worker = (
         os.environ.get("ENABLE_BACKGROUND_WORKER", "false").strip().lower()
@@ -79,17 +85,21 @@ async def lifespan(app_instance: FastAPI):
     )
     tarea_worker: asyncio.Task | None = None
     if habilitar_worker and (os.environ.get("DATABASE_URL") or "").strip():
+        intervalo_configurado = calcular_intervalo_sincronizacion_minutos(
+            int(os.environ.get("WORKER_INTERVAL_MINUTES", str(INTERVALO_MINUTOS_DEFAULT)))
+        )
         tarea_worker = asyncio.create_task(
             iniciar_worker_periodico_background(
-                intervalo_minutos=int(os.environ.get("WORKER_INTERVAL_MINUTES", "180")),
+                intervalo_minutos=intervalo_configurado,
                 muestra_por_categoria=int(
-                    os.environ.get("WORKER_SAMPLE_PER_CATEGORY", "2")
+                    os.environ.get("WORKER_SAMPLE_PER_CATEGORY", "3")
                 ),
                 retardo_inicial_s=45.0,
             )
         )
         logger.info(
-            "Worker en segundo plano de tecHunter GT v5.1 programado exitosamente."
+            "Worker en segundo plano de tecHunter GT v5.2 programado exitosamente (cada %s min / >=3x al día).",
+            intervalo_configurado,
         )
     try:
         yield
@@ -99,12 +109,12 @@ async def lifespan(app_instance: FastAPI):
 
 
 app = FastAPI(
-    title="tecHunter GT v5.1 — Comparador Instantáneo en Guatemala",
+    title="tecHunter GT v5.2 — Comparador Instantáneo en Guatemala",
     description=(
         "Plataforma de comparación de precios en milisegundos respaldada por Neon DB "
-        "(21 tiendas activas en Guatemala, Analítica Privada y Respaldo Instantáneo)."
+        "(24 tiendas activas en Guatemala incluyendo Rech, Click Guatemala y Tera; Worker 3x/Día)."
     ),
-    version="5.1.0",
+    version="5.2.0",
     lifespan=lifespan,
 )
 
@@ -135,6 +145,14 @@ TERMINOS_ZTECH_COMPUTO: tuple[str, ...] = (
     "nvme",
     "teclado",
     "mouse",
+    "mousepad",
+    "diadema",
+    "headset",
+    "webcam",
+    "keychron",
+    "hyperx",
+    "redragon",
+    "corsair",
     "gamer",
     "gaming",
     "volante",
@@ -189,11 +207,17 @@ STOPWORDS_COMPARACION: frozenset[str] = frozenset(
     }
 )
 
-# Scrapers de la ola v5.1 ahora 100% activos en producción
+# Scrapers de las olas v5.1 y v5.2 100% activos en producción
 SCRAPERS_NUEVOS_ACTIVOS_V5_1: dict[str, Any] = {
     "tienda-tigo": TigoScraper(habilitado=True),
     "office-depot": OfficeDepotScraper(habilitado=True),
     "tropigas": TropigasScraper(habilitado=True),
+}
+
+SCRAPERS_NUEVOS_ACTIVOS_V5_2: dict[str, Any] = {
+    "rech": RechScraper(habilitado=True),
+    "click": ClickScraper(habilitado=True),
+    "tera": TeraScraper(habilitado=True),
 }
 
 
@@ -415,6 +439,9 @@ def _calcular_resumen(
             "total_epa": 0,
             "total_novex": 0,
             "total_intelaf": 0,
+            "total_rech": 0,
+            "total_click": 0,
+            "total_tera": 0,
             "total_office_depot": 0,
             "total_tecno_facil": 0,
             "total_la_curacao": 0,
@@ -451,6 +478,9 @@ def _calcular_resumen(
         "total_epa": sum(1 for o in ofertas if o["tienda_slug"] == "epa"),
         "total_novex": sum(1 for o in ofertas if o["tienda_slug"] == "novex"),
         "total_intelaf": sum(1 for o in ofertas if o["tienda_slug"] == "intelaf"),
+        "total_rech": sum(1 for o in ofertas if o["tienda_slug"] == "rech"),
+        "total_click": sum(1 for o in ofertas if o["tienda_slug"] == "click"),
+        "total_tera": sum(1 for o in ofertas if o["tienda_slug"] == "tera"),
         "total_office_depot": sum(
             1 for o in ofertas if o["tienda_slug"] == "office-depot"
         ),
@@ -499,6 +529,9 @@ _CACHE_LECTURA_NEON: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]
 CACHE_NEON_TTL_SEGUNDOS: float = 45.0
 
 _CATALOGOS_MEMORIA_INSTANTANEA: tuple[Any, ...] = (
+    RechScraper(simular=True),
+    ClickScraper(simular=True),
+    TeraScraper(simular=True),
     TigoScraper(simular=True),
     OfficeDepotScraper(simular=True),
     TropigasScraper(simular=True),
@@ -519,7 +552,10 @@ def _buscar_respaldo_rapido_en_memoria(
     """
     termino = (query or "").strip()
     if not termino:
-        termino = "iphone samsung macbook laptop refrigeradora taladro impresora"
+        termino = (
+            "iphone samsung macbook laptop refrigeradora taladro impresora "
+            "teclado diadema mousepad webcam tapo ezviz"
+        )
 
     tienda_limpia = (tienda_slug or "").strip().lower()
     if tienda_limpia == "tecnofacil":
@@ -678,7 +714,7 @@ async def _ejecutar_scraper_seguro(
 @app.get("/health")
 async def health_check() -> dict[str, str]:
     """Endpoint de salud para el balanceador de Render y UptimeRobot."""
-    return {"status": "ok", "service": "tecHunter", "version": "5.1.0"}
+    return {"status": "ok", "service": "tecHunter", "version": "5.2.0"}
 
 
 @app.post("/api/analytics/event")
@@ -732,19 +768,20 @@ async def api_seed_status(
     admin: str = Query(default=""),
 ) -> dict[str, Any]:
     """
-    Expone el estado del Worker de Precarga Inteligente y el cruce de las 21 tiendas activas.
+    Expone el estado del Worker de Precarga Inteligente (3x/día) y el cruce de las 24 tiendas activas.
     Las métricas de analítica solo se incluyen si la petición está autenticada como admin.
     """
     cruce = cruzar_matriz_tiendas_y_prioridades()
     todos_seed = obtener_todos_los_productos_semilla()
     es_admin = _verificar_acceso_admin(request, admin_param=admin)
     respuesta: dict[str, Any] = {
-        "version": "5.1.0",
+        "version": "5.2.0",
         "total_productos_semilla": len(todos_seed),
         "categorias_semilla": {
             cat: len(items) for cat, items in seed_list_guatemala.items()
         },
         "scrapers_recien_activados_v5_1": list(SCRAPERS_NUEVOS_ACTIVOS_V5_1.keys()),
+        "scrapers_recien_activados_v5_2": list(SCRAPERS_NUEVOS_ACTIVOS_V5_2.keys()),
         "worker_precarga": ESTADO_WORKER_PRECARGA,
         "matriz_tiendas": cruce,
     }
