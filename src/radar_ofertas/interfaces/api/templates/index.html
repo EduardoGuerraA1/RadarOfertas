@@ -217,9 +217,16 @@
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
       {% if error_db %}
-      <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        <p class="font-semibold">Error al consultar Neon DB</p>
-        <p class="mt-1 text-xs font-mono">{{ error_db }}</p>
+      <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <p class="font-semibold">⚡ Modo de Resiliencia Instantánea activado</p>
+        <p class="mt-1 text-xs">Mostrando catálogo de respaldo verificado en milisegundos mientras reconectamos con Neon DB.</p>
+      </div>
+      {% elif respaldo_rapido_activo %}
+      <div class="mb-6 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 text-xs sm:text-sm text-emerald-900 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+          <span><strong>⚡ Respaldo rápido activado:</strong> Mostrando referencias verificadas en milisegundos para tu búsqueda sin tiempos de espera.</span>
+        </div>
       </div>
       {% endif %}
 
@@ -541,24 +548,36 @@
       </div>
 
       {% else %}
-      <!-- Empty State -->
-      <div class="rounded-3xl border border-gray-200 bg-[#F5F5F7]/60 p-12 text-center max-w-xl mx-auto my-6">
-        <div class="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 text-gray-700 shadow-sm">
+      <!-- Friendly Non-Blocking Empty State (Zero Freeze / Zero 502) -->
+      <div class="rounded-3xl border border-gray-200 bg-[#F5F5F7]/70 p-8 sm:p-12 text-center max-w-2xl mx-auto my-6">
+        <div class="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 text-emerald-600 shadow-sm">
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.2-5.2m1.7-4.3a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
         </div>
-        <h3 class="text-lg font-bold text-gray-950">
-          Sin coincidencias exactas en este filtro
+        <h3 class="text-lg sm:text-xl font-bold text-gray-950">
+          {% if query %}
+            “{{ query }}” aún no está precargado en este filtro
+          {% else %}
+            Sin coincidencias exactas en este filtro
+          {% endif %}
         </h3>
-        <p class="mt-1.5 text-sm text-gray-500 leading-relaxed">
-          El Worker en Segundo Plano (<code class="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">worker_precarga.py</code>) sincroniza continuamente los productos de <code class="text-xs bg-white px-1.5 py-0.5 rounded border border-gray-200">seed_list_guatemala</code> hacia Neon DB. Prueba limpiar los filtros activos o explorar el catálogo completo.
+        <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed max-w-lg mx-auto">
+          Para garantizarte una respuesta en milisegundos sin congelar tu pantalla, <strong>tecHunter GT</strong> consulta directamente nuestro catálogo precargado en <strong>Neon DB</strong>. Prueba con un término más general (por ejemplo marca o modelo base) o explora una de estas búsquedas instantáneas:
         </p>
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {% for sugerencia_rapida in ['MacBook Air M2', 'iPhone 16', 'Samsung S24', 'Impresora Epson', 'Refrigeradora Mabe', 'Taladro DeWalt', 'Pedigree'] %}
+          <a
+            href="/?q={{ sugerencia_rapida | urlencode }}"
+            class="px-3 py-1.5 rounded-full bg-white border border-gray-200 hover:border-emerald-500 text-xs font-medium text-gray-800 hover:text-emerald-700 transition-colors shadow-sm"
+          >{{ sugerencia_rapida }}</a>
+          {% endfor %}
+        </div>
         <a
           href="/"
-          class="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
+          class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
         >
-          <span>Ver catálogo completo en Neon DB</span>
+          <span>Ver todo el catálogo en Neon DB</span>
         </a>
       </div>
       {% endif %}

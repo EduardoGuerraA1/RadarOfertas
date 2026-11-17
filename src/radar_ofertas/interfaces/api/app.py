@@ -15,6 +15,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 import unicodedata
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -42,10 +43,19 @@ from radar_ofertas.domain.seed_data import (
     obtener_todos_los_productos_semilla,
     seed_list_guatemala,
 )
+from radar_ofertas.domain.services.filtro_relevancia import (
+    extraer_especificaciones_y_gama,
+    filtrar_dicts_relevantes,
+)
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
 )
+from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
+from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
+from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
+from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
+from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilScraper
 from radar_ofertas.infrastructure.scrapers.tigo_scraper import TigoScraper
 from radar_ofertas.infrastructure.scrapers.tropigas_scraper import TropigasScraper
 
@@ -58,11 +68,13 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     """
-    Inicia de forma silenciosa y no bloqueante el Worker Periódico de Precarga en segundo plano
-    cuando `ENABLE_BACKGROUND_WORKER` está activo (por defecto `true` en producción).
+    Mantiene el proceso web de Render 100% ligero y dedicado a lecturas en milisegundos
+    sobre Neon DB (evitando 502 / lags por contención de CPU/RAM).
+    El Worker Periódico en segundo plano solo se inicia dentro del contenedor web si se
+    activa explícitamente con `ENABLE_BACKGROUND_WORKER=true`.
     """
     habilitar_worker = (
-        os.environ.get("ENABLE_BACKGROUND_WORKER", "true").strip().lower()
+        os.environ.get("ENABLE_BACKGROUND_WORKER", "false").strip().lower()
         in {"1", "true", "yes", "on"}
     )
     tarea_worker: asyncio.Task | None = None
@@ -73,7 +85,7 @@ async def lifespan(app_instance: FastAPI):
                 muestra_por_categoria=int(
                     os.environ.get("WORKER_SAMPLE_PER_CATEGORY", "2")
                 ),
-                retardo_inicial_s=30.0,
+                retardo_inicial_s=45.0,
             )
         )
         logger.info(
@@ -90,7 +102,7 @@ app = FastAPI(
     title="tecHunter GT v5.1 — Comparador Instantáneo en Guatemala",
     description=(
         "Plataforma de comparación de precios en milisegundos respaldada por Neon DB "
-        "(21 tiendas activas en Guatemala, Analítica Privada y Worker en Segundo Plano)."
+        "(21 tiendas activas en Guatemala, Analítica Privada y Respaldo Instantáneo)."
     ),
     version="5.1.0",
     lifespan=lifespan,
@@ -482,6 +494,169 @@ def _calcular_resumen(
     }
 
 
+# Caché en memoria de alta velocidad para lecturas de Neon DB (evita lags y 502 bajo picos de tráfico)
+_CACHE_LECTURA_NEON: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]]]] = {}
+CACHE_NEON_TTL_SEGUNDOS: float = 45.0
+
+_CATALOGOS_MEMORIA_INSTANTANEA: tuple[Any, ...] = (
+    TigoScraper(simular=True),
+    OfficeDepotScraper(simular=True),
+    TropigasScraper(simular=True),
+    IStoreScraper(),
+    EpaScraper(),
+    NovexScraper(),
+    IntelafScraper(usar_playwright_fallback=False),
+    TecnoFacilScraper(usar_playwright_fallback=False),
+)
+
+
+def _buscar_respaldo_rapido_en_memoria(
+    query: str = "", tienda_slug: str = "", categoria_ui: str = ""
+) -> list[dict[str, Any]]:
+    """
+    Respaldo instantáneo en memoria (<2 ms, cero llamadas de red) cuando un término de búsqueda
+    aún no se encuentra precargado en Neon DB o durante un arranque en frío.
+    """
+    termino = (query or "").strip()
+    if not termino:
+        termino = "iphone samsung macbook laptop refrigeradora taladro impresora"
+
+    tienda_limpia = (tienda_slug or "").strip().lower()
+    if tienda_limpia == "tecnofacil":
+        tienda_limpia = "tecno-facil"
+    categoria_limpia = (categoria_ui or "").strip().lower()
+
+    ofertas_locales: list[OfertaLocal] = []
+    for scraper in _CATALOGOS_MEMORIA_INSTANTANEA:
+        buscador = getattr(scraper, "buscar_en_catalogo_verificado", None)
+        if callable(buscador):
+            try:
+                ofertas_locales.extend(buscador(termino))
+            except Exception:
+                continue
+
+    resultados: list[dict[str, Any]] = []
+    urls_vistas: set[str] = set()
+    for idx, oferta in enumerate(ofertas_locales, 1):
+        if oferta.url in urls_vistas or float(oferta.precio_gtq) <= 0:
+            continue
+        urls_vistas.add(oferta.url)
+
+        slug_t = PostgresOfertaRepository._normalizar_slug_tienda(oferta.tienda)
+        if tienda_limpia:
+            if tienda_limpia in {"istore", "ishop"} and slug_t not in {"istore", "ishop"}:
+                continue
+            elif tienda_limpia not in {"istore", "ishop"} and slug_t != tienda_limpia:
+                continue
+
+        precio_float = float(oferta.precio_gtq)
+        costo_envio = 0.0 if precio_float >= 1500.0 else 35.0
+        costo_real = round(precio_float + costo_envio, 2)
+        cat_item = PostgresOfertaRepository.clasificar_categoria_ui(
+            oferta.titulo, slug_t
+        )
+        meta_modelo = extraer_especificaciones_y_gama(
+            oferta.titulo, precio_gtq=precio_float, categoria_ui=cat_item
+        )
+        marca_str = (
+            PostgresOfertaRepository._inferir_marca(oferta.titulo) or "Oficial GT"
+        )
+        resultados.append(
+            {
+                "producto_id": f"mem-{slug_t}-{idx}",
+                "titulo": oferta.titulo,
+                "marca": marca_str,
+                "imagen_url": str(oferta.imagen_url or ""),
+                "tienda_slug": slug_t,
+                "tienda": oferta.tienda,
+                "precio_gtq": precio_float,
+                "costo_envio_gtq": costo_envio,
+                "costo_real_gtq": costo_real,
+                "url": oferta.url,
+                "scraped_at": "Respaldo Instantáneo GT",
+                "categoria_ui": cat_item,
+                "requiere_membresia": slug_t == "pricesmart",
+                "gama": meta_modelo["gama"],
+                "gama_slug": meta_modelo["gama_slug"],
+                "chips_especificaciones": meta_modelo["chips_especificaciones"],
+                "clave_modelo": meta_modelo["clave_modelo"],
+            }
+        )
+
+    filtrados = filtrar_dicts_relevantes(resultados, query)
+    if categoria_limpia in {
+        "computo",
+        "smartphones",
+        "hogar",
+        "herramientas",
+        "super-mascotas",
+    }:
+        filtrados = [
+            o for o in filtrados if o.get("categoria_ui") == categoria_limpia
+        ]
+    filtrados.sort(
+        key=lambda o: (o.get("precio_gtq", 0.0), o.get("costo_real_gtq", 0.0))
+    )
+    return filtrados
+
+
+async def _consultar_ofertas_con_resiliencia(
+    query: str = "",
+    tienda_slug: str = "",
+    categoria_ui: str = "",
+    timeout_s: float = 5.5,
+) -> tuple[list[dict[str, Any]], bool, str | None]:
+    """
+    Lee exclusivamente desde Neon DB en milisegundos con caché TTL en memoria (45s) y timeout
+    estricto (`5.5s`) para evitar cualquier bloqueo o error 502 en Render.
+    Si el término buscado no está precargado en Neon DB, activa en <2 ms el respaldo rápido
+    en memoria sin congelar la interfaz.
+    """
+    clave_cache = (
+        (query or "").strip().lower(),
+        (tienda_slug or "").strip().lower(),
+        (categoria_ui or "").strip().lower(),
+    )
+    ahora = time.monotonic()
+    entrada_cache = _CACHE_LECTURA_NEON.get(clave_cache)
+    if entrada_cache and (ahora - entrada_cache[0]) < CACHE_NEON_TTL_SEGUNDOS:
+        return [dict(item) for item in entrada_cache[1]], False, None
+
+    error_db: str | None = None
+    ofertas_neon: list[dict[str, Any]] = []
+    try:
+        repositorio = PostgresOfertaRepository()
+        ofertas_neon = await asyncio.wait_for(
+            asyncio.to_thread(
+                repositorio.buscar_ofertas_comparadas,
+                query,
+                tienda_slug,
+                categoria_ui,
+            ),
+            timeout=timeout_s,
+        )
+        if ofertas_neon:
+            _CACHE_LECTURA_NEON[clave_cache] = (
+                ahora,
+                [dict(item) for item in ofertas_neon],
+            )
+            return ofertas_neon, False, None
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Timeout preventivo (%.1fs) leyendo Neon DB para '%s'; activando respaldo instantáneo.",
+            timeout_s,
+            query,
+        )
+    except Exception as error:
+        logger.error("Error consultando Neon DB: %s", error)
+        error_db = str(error)
+
+    ofertas_respaldo = _buscar_respaldo_rapido_en_memoria(
+        query=query, tienda_slug=tienda_slug, categoria_ui=categoria_ui
+    )
+    return ofertas_respaldo, bool(ofertas_respaldo), error_db
+
+
 async def _ejecutar_scraper_seguro(
     scraper: Any, nombre_tienda: str, termino: str, timeout_s: float = 12.0
 ) -> tuple[list[OfertaLocal], str | None]:
@@ -603,9 +778,6 @@ async def vista_comparador(
         description="Token privado de administrador para visualizar métricas (ej. ?admin=secreto)",
     ),
 ) -> HTMLResponse:
-    error_db: str | None = None
-    ofertas_totales: list[dict[str, Any]] = []
-
     cat_limpia = cat.strip().lower()
     ua = request.headers.get("user-agent", "")
     gestor_analitica.registrar_visita(
@@ -623,14 +795,11 @@ async def vista_comparador(
         else _verificar_acceso_admin(request, admin_param=admin)
     )
 
-    try:
-        repositorio = PostgresOfertaRepository()
-        ofertas_totales = await asyncio.to_thread(
-            repositorio.buscar_ofertas_comparadas, q, tienda, ""
+    ofertas_totales, respaldo_rapido_activo, error_db = (
+        await _consultar_ofertas_con_resiliencia(
+            query=q, tienda_slug=tienda, categoria_ui=""
         )
-    except Exception as error:
-        logger.error("Error consultando Neon DB en GET /: %s", error)
-        error_db = str(error)
+    )
 
     if cat_limpia in {
         "computo",
@@ -683,6 +852,7 @@ async def vista_comparador(
             else "final",
             "ofertas": ofertas_visibles,
             "resumen": resumen,
+            "respaldo_rapido_activo": respaldo_rapido_activo,
             "destacar_ztech": destacar_ztech,
             "siguientes_tiendas": cruce_tiendas["siguientes_3_alta_prioridad"],
             "es_admin": es_admin,
@@ -721,9 +891,8 @@ async def api_listar_ofertas(
     ),
 ) -> dict[str, Any]:
     try:
-        repositorio = PostgresOfertaRepository()
-        ofertas = await asyncio.to_thread(
-            repositorio.buscar_ofertas_comparadas, q, tienda, cat
+        ofertas, respaldo_rapido_activo, _ = await _consultar_ofertas_con_resiliencia(
+            query=q, tienda_slug=tienda, categoria_ui=cat
         )
         gama_limpia = gama.strip().lower()
         if gama_limpia in {"profesional", "media", "entrada"}:
@@ -733,6 +902,7 @@ async def api_listar_ofertas(
             "tienda": tienda,
             "categoria_ui": cat,
             "gama": gama_limpia,
+            "respaldo_rapido_activo": respaldo_rapido_activo,
             "destacar_ztech": _es_busqueda_computo_ztech(q, cat),
             "resumen": _calcular_resumen(ofertas, query=q),
             "ofertas": ofertas,

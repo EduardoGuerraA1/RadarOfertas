@@ -81,7 +81,7 @@ class _NeonHttpCursor:
             },
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=20) as resp:
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
         fields = [f["name"] for f in data.get("fields", [])]
@@ -113,7 +113,6 @@ class _NeonHttpConnection:
 
     def __enter__(self) -> _NeonHttpConnection:
         return self
-
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         pass
 
@@ -136,7 +135,7 @@ class PostgresOfertaRepository(OfertaRepository):
 
     def _get_connection(self):
         try:
-            return psycopg2.connect(self._database_url)
+            return psycopg2.connect(self._database_url, connect_timeout=3)
         except psycopg2.OperationalError as error:
             if "neon.tech" in self._database_url:
                 logger.info(

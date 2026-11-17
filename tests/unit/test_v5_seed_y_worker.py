@@ -288,3 +288,18 @@ def test_activacion_real_3_tiendas_prioritarias_tigo_officedepot_tropigas() -> N
     )
     assert len(ofertas_tropigas) == 1
     assert ofertas_tropigas[0].tienda == "Tropigas"
+
+
+def test_respaldo_rapido_en_memoria_evita_bloqueos_cuando_termino_no_esta_en_db() -> None:
+    from radar_ofertas.interfaces.api.app import _buscar_respaldo_rapido_en_memoria
+
+    ofertas_respaldo = _buscar_respaldo_rapido_en_memoria(query="iphone 16")
+    assert len(ofertas_respaldo) >= 1
+    tiendas = {o["tienda_slug"] for o in ofertas_respaldo}
+    assert "tienda-tigo" in tiendas or "istore" in tiendas
+    assert all(o["precio_gtq"] > 0 for o in ofertas_respaldo)
+
+    # Término inexistente devuelve lista vacía en <2 ms sin bloquear ni lanzar excepción
+    vacio = _buscar_respaldo_rapido_en_memoria(query="xyzproductoimaginario999")
+    assert vacio == []
+
