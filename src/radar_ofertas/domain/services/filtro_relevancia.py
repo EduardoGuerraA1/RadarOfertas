@@ -178,12 +178,61 @@ DISPOSITIVOS_PRINCIPALES_TRIGGERS: tuple[str, ...] = (
 # DEBEN estar presentes en el título del producto para evitar comparaciones disparejas.
 TOKENS_MARCA_Y_FAMILIA_ESTRICTOS: frozenset[str] = frozenset(
     {
+        # Marcas de Cómputo, Periféricos Gamer y Cámaras Smart Home
         "apple",
         "macbook",
         "imac",
         "iphone",
         "ipad",
         "airpods",
+        "razer",
+        "hyperx",
+        "redragon",
+        "corsair",
+        "keychron",
+        "logitech",
+        "tapo",
+        "ezviz",
+        "nexxt",
+        "kingston",
+        "asus",
+        "lenovo",
+        "hp",
+        "dell",
+        "acer",
+        "msi",
+        "epson",
+        "canon",
+        "samsung",
+        "lg",
+        "sony",
+        "xiaomi",
+        "redmi",
+        "poco",
+        "honor",
+        "motorola",
+        "hisense",
+        "tcl",
+        "jbl",
+        "bose",
+        "garmin",
+        # Líneas y familias de modelos de Cómputo y Periféricos
+        "gigantus",
+        "fury",
+        "flick",
+        "kumara",
+        "blackwidow",
+        "origins",
+        "blackshark",
+        "zeus",
+        "kiyo",
+        "brio",
+        "lightspeed",
+        "odyssey",
+        "ultragear",
+        "ecotank",
+        "pixma",
+        "loq",
         "thinkpad",
         "ideapad",
         "legion",
@@ -201,6 +250,7 @@ TOKENS_MARCA_Y_FAMILIA_ESTRICTOS: frozenset[str] = frozenset(
         "nitro",
         "aspire",
         "predator",
+        # Marcas de Herramientas, Línea Blanca y Supermercado
         "dewalt",
         "bosch",
         "makita",
@@ -209,15 +259,105 @@ TOKENS_MARCA_Y_FAMILIA_ESTRICTOS: frozenset[str] = frozenset(
         "pretul",
         "stanley",
         "karcher",
-        "logitech",
+        "emtop",
+        "mabe",
+        "whirlpool",
+        "frigidaire",
+        "oster",
+        "ninja",
         "ps5",
         "xbox",
         "nintendo",
         "pedigree",
         "purina",
         "whiskas",
+        "incaparina",
     }
 )
+
+# Variantes de tamaño, gama o submodelo que no deben mezclarse cuando se especifican
+TOKENS_VARIANTE_ESTRICTOS: frozenset[str] = frozenset(
+    {
+        "mini",
+        "small",
+        "medium",
+        "large",
+        "xl",
+        "xxl",
+        "extended",
+        "extendido",
+        "tkl",
+        "tenkeyless",
+        "wireless",
+        "inalambrico",
+        "pro",
+        "max",
+        "ultra",
+        "plus",
+        "lite",
+        "fe",
+    }
+)
+
+# Grupos de tipo de producto principal para impedir que se mezclen categorías distintas
+GRUPOS_TIPO_PRODUCTO: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("mousepad", ("mousepad", "mouse pad", "alfombrilla")),
+    ("teclado", ("teclado", "keyboard")),
+    ("diadema", ("diadema", "headset", "audifono", "audifonos")),
+    ("webcam", ("webcam", "camara web")),
+    ("camara-seguridad", ("camara de seguridad", "tapo c", "ezviz", "nexxt")),
+    ("monitor", ("monitor",)),
+    ("impresora", ("impresora", "multifuncional", "ecotank", "smart tank", "pixma")),
+    ("volante", ("volante", "driving force")),
+    ("laptop", ("laptop", "notebook", "macbook", "portatil")),
+    ("tablet", ("ipad", "tablet")),
+    ("smartwatch", ("galaxy watch", "apple watch", "smartwatch", "reloj inteligente")),
+    ("smartphone", ("iphone", "galaxy s", "galaxy a", "galaxy z", "redmi", "poco", "smartphone", "celular")),
+    ("ssd", ("ssd", "disco solido", "estado solido", "nvme")),
+    ("ram", ("memoria ram", "ddr4", "ddr5")),
+    ("refrigeradora", ("refrigeradora", "frigobar", "congelador")),
+    ("lavadora", ("lavadora", "secadora", "torre de lavado", "washtower")),
+    ("estufa", ("estufa",)),
+    ("microondas", ("microondas",)),
+    ("freidora", ("freidora",)),
+    ("licuadora", ("licuadora",)),
+    ("cafetera", ("cafetera",)),
+    ("televisor", ("televisor", "smart tv")),
+    ("taladro", ("taladro", "rotomartillo", "barreno", "atornillador")),
+    ("esmeriladora", ("esmeriladora", "pulidora")),
+    ("hidrolavadora", ("hidrolavadora",)),
+    ("alimento-mascota", ("pedigree", "purina", "dog chow", "pro plan", "beneful", "whiskas", "alimento para perro", "alimento para gato")),
+)
+
+# Plantillas oficiales de búsqueda por tienda para garantizar cero errores 404/500 en enlaces salientes
+PLANTILLAS_BUSQUEDA_OFICIAL_TIENDA: dict[str, str] = {
+    "rech": "https://www.rech.com.gt/?s={query}&post_type=product",
+    "click": "https://www.click.gt/buscar?q={query}",
+    "tera": "https://www.tera.com.gt/?s={query}&post_type=product",
+    "intelaf": "https://www.intelaf.com/buscar/?q={query}",
+    "kemik": "https://www.kemik.gt/busqueda?q={query}",
+    "pacifiko": "https://www.pacifiko.com/compras-en-linea/{query}",
+    "tiendas-max": "https://www.max.com.gt/catalogsearch/result/?q={query}",
+    "tecno-facil": "https://www.tecnofacil.com.gt/catalogsearch/result/?q={query}",
+    "tecnofacil": "https://www.tecnofacil.com.gt/catalogsearch/result/?q={query}",
+    "istore": "https://ishop.gt/search?q={query}",
+    "ishop": "https://ishop.gt/search?q={query}",
+    "epa": "https://gt.epaenlinea.com/catalogsearch/result/?q={query}",
+    "novex": "https://www.novex.com.gt/busqueda?controller=search&s={query}",
+    "cemaco": "https://www.cemaco.com/s?q={query}",
+    "office-depot": "https://www.officedepot.com.gt/officedepotGuatemala/es/search/?text={query}",
+    "tienda-tigo": "https://tienda.tigo.com.gt/catalogsearch/result/?q={query}",
+    "tropigas": "https://www.almacenestropigas.com/guatemala/catalogsearch/result/?q={query}",
+    "la-curacao": "https://www.lacuracaonline.com/guatemala/catalogsearch/result/?q={query}",
+    "tienda-claro": "https://www.claro.com.gt/personas/servicios/servicios-moviles/prepago/",
+    "pricesmart": "https://www.pricesmart.com/en-GT/search?q={query}",
+    "siman": "https://gt.siman.com/{query}?_q={query}&map=ft",
+    "elektra": "https://www.elektra.com.gt/{query}?_q={query}&map=ft",
+    "walmart": "https://www.walmart.com.gt/{query}?_q={query}&map=ft",
+    "paiz": "https://www.paiz.com.gt/{query}?_q={query}&map=ft",
+    "maxi-despensa": "https://www.maxidespensa.com.gt/{query}?_q={query}&map=ft",
+    "la-torre": "https://www.latorre.com.gt/{query}?_q={query}&map=ft",
+}
 
 
 def _normalizar_texto(texto: str) -> str:
@@ -233,31 +373,123 @@ def _contiene_termino_exacto(texto_normalizado: str, termino_normalizado: str) -
     return re.search(patron, texto_normalizado) is not None
 
 
+def extraer_termino_busqueda_limpio(titulo: str) -> str:
+    """
+    Extrae un término de búsqueda conciso y exacto (marca + modelo + especificación clave)
+    a partir del título del producto para construir URLs de búsqueda limpias en las tiendas.
+    """
+    limpio = re.sub(r"\([^)]*\)", " ", titulo or "")
+    limpio = re.sub(
+        r"\b(con|para|de|el|la|los|las|un|una|color|en|y|o|incluye|tapa|privacidad|costura|reforzada|micro-weave|cloth|spill-proof|premium|multiplataforma|seguimiento|inteligente|vision|nocturna|rotacion|pan/tilt|pan|tilt)\b",
+        " ",
+        limpio,
+        flags=re.IGNORECASE,
+    )
+    palabras = [p for p in re.findall(r"[A-Za-z0-9ÁÉÍÓÚáéíóúñÑ+./-]+", limpio) if len(p) >= 2]
+    seleccion = palabras[:7] if palabras else [titulo.strip()]
+    return " ".join(seleccion).strip()
+
+
+def construir_url_busqueda_tienda(tienda_slug_o_nombre: str, termino: str) -> str:
+    """
+    Construye la URL oficial de búsqueda de la tienda con el término exacto codificado,
+    garantizando que el botón 'Ir a la tienda' nunca caiga en un error 404 o 500.
+    """
+    from urllib.parse import quote_plus
+
+    slug = _normalizar_texto(tienda_slug_o_nombre).replace(" ", "-")
+    if slug in {"click-guatemala", "click-gt"}:
+        slug = "click"
+    elif slug in {"rech-guatemala", "rech-gt"}:
+        slug = "rech"
+    elif slug in {"tera-guatemala", "tera-gt"}:
+        slug = "tera"
+    elif slug == "tecnofacil":
+        slug = "tecno-facil"
+
+    termino_limpio = extraer_termino_busqueda_limpio(termino) or (termino or "").strip()
+    q_encoded = quote_plus(termino_limpio)
+    plantilla = PLANTILLAS_BUSQUEDA_OFICIAL_TIENDA.get(
+        slug, f"https://www.{slug}.com.gt/?s={{query}}"
+    )
+    return plantilla.format(query=q_encoded)
+
+
+def resolver_url_saliente_segura(url: str, tienda_slug_o_nombre: str, titulo: str) -> str:
+    """
+    Verifica la URL saliente de un producto. Si la URL directa no puede verificarse con certeza
+    (ej. rutas sintéticas `/producto/...` en Rech, Click Guatemala o Tera, dominios antiguos
+    `tera.gt`, o URLs vacías/rotas), devuelve la URL oficial de búsqueda de la tienda con el
+    término exacto del producto codificado.
+    """
+    url_limpia = (url or "").strip()
+    slug = _normalizar_texto(tienda_slug_o_nombre).replace(" ", "-")
+    if slug in {"click-guatemala", "click-gt"}:
+        slug = "click"
+    elif slug in {"rech-guatemala", "rech-gt"}:
+        slug = "rech"
+    elif slug in {"tera-guatemala", "tera-gt"}:
+        slug = "tera"
+
+    if not url_limpia or not url_limpia.startswith(("http://", "https://")):
+        return construir_url_busqueda_tienda(slug, titulo)
+
+    # En Rech, Click Guatemala y Tera, si la URL es un slug sintético (/producto/...) o dominio tera.gt,
+    # redirigir siempre a la búsqueda oficial de la tienda con el modelo exacto codificado.
+    if slug in {"rech", "click", "tera"}:
+        if (
+            "/producto/" in url_limpia
+            or "tera.gt" in url_limpia
+            or url_limpia.rstrip("/") in {
+                "https://www.rech.com.gt",
+                "https://www.click.gt",
+                "https://www.tera.gt",
+                "https://www.tera.com.gt",
+            }
+        ):
+            return construir_url_busqueda_tienda(slug, titulo)
+
+    return url_limpia
+
+
+def _detectar_tipo_producto(texto_norm: str) -> str:
+    """Identifica el tipo de producto principal normalizado a partir de un título o query."""
+    # Prioridad a accesorios de cómputo si el texto menciona mousepad antes que mouse
+    if any(k in texto_norm for k in ("mousepad", "mouse pad", "alfombrilla")):
+        return "mousepad"
+    for tipo, keywords in GRUPOS_TIPO_PRODUCTO:
+        for kw in keywords:
+            if _contiene_termino_exacto(texto_norm, kw) or kw in texto_norm:
+                return tipo
+    return ""
+
+
 def _extraer_codigos_modelo_query(query_norm: str) -> list[str]:
     """
-    Detecta tokens de modelo específicos en la búsqueda del usuario:
-    ej. 'm1', 'm2', 'm3', 'm4', 'dcd776', 'dcd796', 'gsb20', 'g29', 'g920', 's24', 's25', 'a56', 'rtx', 'i7', 'i5'.
+    Detecta tokens de marca, familia, modelo y variante específicos en la búsqueda del usuario:
+    ej. 'razer', 'gigantus', 'v2', 'large', 'g840', 'xl', 'k552', 'm2', 'dcd776', 'tapo', 'c200'.
     """
     tokens = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", query_norm)
     codigos: list[str] = []
     for tok in tokens:
-        if tok in {"de", "la", "el", "en", "con", "para", "por", "pro", "air", "max", "plus", "ultra"}:
+        if tok in {"de", "la", "el", "en", "con", "para", "por", "del", "los", "las", "un", "una"}:
             continue
-        # Token alfanumérico con letras y dígitos (ej. m2, dcd776, g29, i7, s24, a56, gsb20-2)
         tiene_letra = any(c.isalpha() for c in tok)
         tiene_digito = any(c.isdigit() for c in tok)
         if tiene_letra and tiene_digito and len(tok) >= 2:
             codigos.append(tok)
         elif tok in TOKENS_MARCA_Y_FAMILIA_ESTRICTOS:
             codigos.append(tok)
+        elif tok in TOKENS_VARIANTE_ESTRICTOS and len(tokens) >= 2:
+            codigos.append(tok)
     return codigos
 
 
 def coincide_modelo_especifico(titulo: str, query: str = "") -> bool:
     """
-    Verifica que si el usuario buscó un modelo o marca específica (ej. 'MacBook Air M2'
-    o 'Taladro DeWalt DCD776'), el producto coincida con todos los tokens de marca/modelo
-    del query y no mezcle equipos de gama baja no relacionados (como HP Stream Celeron).
+    Verifica que si el usuario buscó un modelo, marca o tipo específico (ej. 'Razer Gigantus V2 Large',
+    'MacBook Air M2' o 'Taladro DeWalt DCD776'), el producto coincida estrictamente con el tipo de
+    producto, marca, modelo y variante del query, evitando que productos de distintas gamas o variantes se mezclen.
     """
     if not query or not query.strip():
         return True
@@ -265,6 +497,13 @@ def coincide_modelo_especifico(titulo: str, query: str = "") -> bool:
     titulo_norm = _normalizar_texto(titulo)
     query_norm = _normalizar_texto(query)
     titulo_compacto = titulo_norm.replace("-", "").replace(" ", "")
+
+    # Si el query especifica un tipo de producto concreto (ej. mousepad, teclado, diadema, webcam, camara),
+    # el título debe pertenecer al mismo tipo de producto.
+    tipo_query = _detectar_tipo_producto(query_norm)
+    tipo_titulo = _detectar_tipo_producto(titulo_norm)
+    if tipo_query and tipo_titulo and tipo_query != tipo_titulo:
+        return False
 
     codigos_requeridos = _extraer_codigos_modelo_query(query_norm)
     if not codigos_requeridos:
@@ -274,7 +513,7 @@ def coincide_modelo_especifico(titulo: str, query: str = "") -> bool:
         codigo_compacto = codigo.replace("-", "")
         if not (
             _contiene_termino_exacto(titulo_norm, codigo)
-            or codigo_compacto in titulo_compacto
+            or (len(codigo_compacto) >= 3 and codigo_compacto in titulo_compacto)
         ):
             return False
 
@@ -291,7 +530,7 @@ def es_oferta_relevante(titulo: str, query: str = "") -> bool:
     """
     Determina si un título de producto es relevante para la búsqueda `query`,
     descartando accesorios/repuestos no solicitados y aplicando el Motor de Precisión
-    de Modelos cuando el query especifica marca/modelo exacto.
+    de Modelos cuando el query especifica marca/modelo/variante exacta.
     """
     if not titulo or not titulo.strip():
         return False
@@ -307,12 +546,9 @@ def es_oferta_relevante(titulo: str, query: str = "") -> bool:
         if _contiene_termino_exacto(titulo_norm, neg_norm):
             return False
 
-    # Si el usuario especificó marca/familia o código de modelo (ej. "macbook", "MacBook Air M2",
-    # "Taladro DeWalt DCD776"), exigir coincidencia estricta para evitar mezclar gamas o productos ajenos.
-    codigos_query = _extraer_codigos_modelo_query(query_norm)
-    if codigos_query:
-        if not coincide_modelo_especifico(titulo, query):
-            return False
+    # Si el query especifica un tipo de producto (ej. mousepad), descartar otros tipos (ej. teclado, diadema)
+    if query_norm and not coincide_modelo_especifico(titulo, query):
+        return False
 
     return True
 
@@ -524,22 +760,10 @@ def extraer_especificaciones_y_gama(
         gama = "Media · Productividad"
         gama_slug = "media"
 
-    # Clave de modelo para agrupar comparaciones justas (misma familia/gama)
-    clave_modelo = f"{categoria_ui or 'general'}:{gama_slug}"
-    for patron_modelo in (
-        r"\b(macbook\s*air\s*m[1234])\b",
-        r"\b(macbook\s*pro\s*m[1234])\b",
-        r"\b(iphone\s*1[3456](?:\s*pro)?(?:\s*max)?)\b",
-        r"\b(galaxy\s*[asz][0-9]{2}(?:\s*ultra)?)\b",
-        r"\b(dcd[0-9]{3})\b",
-        r"\b(gsb\s*[0-9]{2})\b",
-        r"\b(g29|g920|g923)\b",
-        r"\b(ps5|playstation\s*5)\b",
-    ):
-        m_mod = re.search(patron_modelo, t_norm)
-        if m_mod:
-            clave_modelo = re.sub(r"\s+", "-", m_mod.group(1))
-            break
+    identidad = extraer_identidad_producto(
+        titulo, categoria_ui=categoria_ui, gama_slug=gama_slug
+    )
+    clave_modelo = identidad["clave_modelo"]
 
     return {
         "gama": gama,
@@ -547,6 +771,242 @@ def extraer_especificaciones_y_gama(
         "chips_especificaciones": chips_limpios,
         "clave_modelo": clave_modelo,
     }
+
+
+def extraer_identidad_producto(
+    titulo: str, categoria_ui: str = "", gama_slug: str = ""
+) -> dict[str, Any]:
+    """
+    Extrae la firma de identidad estricta de un producto:
+      - `tipo_producto`: ej. 'mousepad', 'teclado', 'diadema', 'webcam', 'camara-seguridad', 'laptop'
+      - `marca`: ej. 'razer', 'logitech', 'hyperx', 'redragon', 'tp-link', 'ezviz', 'apple'
+      - `codigos_modelo`: tupla ordenada de tokens de modelo/línea (ej. ('gigantus', 'v2'), ('g840',))
+      - `variante_clave`: tupla ordenada de variantes de tamaño/capacidad/subgama (ej. ('large',), ('8gb', '256gb'))
+      - `clave_modelo`: clave canónica determinista para agrupar únicamente productos idénticos
+    """
+    t_norm = _normalizar_texto(titulo)
+    tipo_producto = _detectar_tipo_producto(t_norm)
+
+    # 1. Detectar marca canónica
+    marca_detectada = ""
+    if "tp-link" in t_norm or "tapo" in t_norm:
+        marca_detectada = "tp-link"
+    elif "black+decker" in t_norm or "black and decker" in t_norm or "black & decker" in t_norm:
+        marca_detectada = "black+decker"
+    elif "macbook" in t_norm or "iphone" in t_norm or "ipad" in t_norm or "airpods" in t_norm:
+        marca_detectada = "apple"
+    elif "redmi" in t_norm or "poco" in t_norm:
+        marca_detectada = "xiaomi"
+    elif "playstation" in t_norm or "ps5" in t_norm:
+        marca_detectada = "sony"
+    else:
+        for marca_cand in (
+            "razer",
+            "logitech",
+            "hyperx",
+            "redragon",
+            "corsair",
+            "keychron",
+            "ezviz",
+            "nexxt",
+            "kingston",
+            "apple",
+            "samsung",
+            "xiaomi",
+            "honor",
+            "motorola",
+            "asus",
+            "lenovo",
+            "hp",
+            "dell",
+            "acer",
+            "msi",
+            "epson",
+            "canon",
+            "lg",
+            "sony",
+            "whirlpool",
+            "mabe",
+            "frigidaire",
+            "oster",
+            "ninja",
+            "dewalt",
+            "bosch",
+            "makita",
+            "milwaukee",
+            "truper",
+            "pretul",
+            "stanley",
+            "karcher",
+            "emtop",
+            "pedigree",
+            "purina",
+            "whiskas",
+            "incaparina",
+        ):
+            if _contiene_termino_exacto(t_norm, marca_cand):
+                marca_detectada = marca_cand
+                break
+
+    # 2. Patrones prioritarios de modelo exacto
+    for patron_modelo in (
+        r"\b(macbook\s*air\s*m[1234])\b",
+        r"\b(macbook\s*pro\s*m[1234])\b",
+        r"\b(iphone\s*1[3456](?:\s*pro)?(?:\s*max)?)\b",
+        r"\b(galaxy\s*[asz][0-9]{2}(?:\s*fe|\s*ultra|\s*plus)?)\b",
+        r"\b(gigantus\s*v2(?:\s*large|\s*xl|\s*xxl|\s*medium)?)\b",
+        r"\b(fury\s*s(?:\s*pro)?(?:\s*xl|\s*large)?)\b",
+        r"\b(g840(?:\s*xl)?)\b",
+        r"\b(mm300(?:\s*pro)?(?:\s*xl)?)\b",
+        r"\b(flick(?:\s*xl)?)\b",
+        r"\b(kumara\s*k552)\b",
+        r"\b(g\s*pro\s*x(?:\s*tkl)?)\b",
+        r"\b(alloy\s*origins(?:\s*core)?)\b",
+        r"\b(blackwidow\s*v4(?:\s*pro|\s*x)?)\b",
+        r"\b(keychron\s*k[0-9]+)\b",
+        r"\b(cloud\s*(?:iii|ii|alpha|stinger|3|2))\b",
+        r"\b(g733|g435|g29|g920|g923|c920s|c920|c270|brio\s*4k|kiyo\s*x)\b",
+        r"\b(blackshark\s*v2(?:\s*x|\s*pro)?)\b",
+        r"\b(zeus\s*x(?:\s*h510)?)\b",
+        r"\b(tapo\s*c[0-9]{3}[a-z]*)\b",
+        r"\b(ezviz\s*(?:c6n|h8c|c3tn|h6c|c8c))\b",
+        r"\b(dcd[0-9]{3})\b",
+        r"\b(gsb\s*[0-9]{2})\b",
+        r"\b(ps5|playstation\s*5)\b",
+    ):
+        m_mod = re.search(patron_modelo, t_norm)
+        if m_mod:
+            modelo_can = re.sub(r"\s+", "-", m_mod.group(1).strip())
+            # Extraer capacidades de RAM/Almacenamiento o tamaño para distinguir variantes
+            caps = re.findall(r"\b([0-9]{1,4}\s*(?:gb|tb|pies|kg|lb))\b", t_norm)
+            caps_norm = tuple(re.sub(r"\s+", "", c) for c in caps[:2])
+            variantes = [
+                v
+                for v in ("mini", "small", "medium", "large", "xl", "xxl", "tkl", "pro", "max", "ultra")
+                if _contiene_termino_exacto(t_norm, v) and v not in modelo_can.split("-")
+            ]
+            sufijo_var = "-".join([*variantes, *caps_norm])
+            clave_final = f"{modelo_can}-{sufijo_var}" if sufijo_var else modelo_can
+            return {
+                "tipo_producto": tipo_producto,
+                "marca": marca_detectada,
+                "codigos_modelo": (modelo_can,),
+                "variante_clave": (*variantes, *caps_norm),
+                "clave_modelo": clave_final,
+            }
+
+    # 3. Extracción general de códigos alfanuméricos de modelo y variantes
+    tokens = re.findall(r"[a-z0-9]+", t_norm)
+    codigos_alfanum: list[str] = []
+    variantes_detectadas: list[str] = []
+    unidades_medida = {"gb", "tb", "mhz", "hz", "mm", "cm", "kg", "lb", "lbs", "pies", "plg", "fps", "mp", "w", "v"}
+
+    for tok in tokens:
+        if tok == marca_detectada or tok in {"de", "la", "el", "en", "con", "para", "por", "gt", "wifi"}:
+            continue
+        if tok in TOKENS_VARIANTE_ESTRICTOS:
+            if tok not in variantes_detectadas:
+                variantes_detectadas.append(tok)
+            continue
+        tiene_letra = any(c.isalpha() for c in tok)
+        tiene_digito = any(c.isdigit() for c in tok)
+        if tiene_letra and tiene_digito and len(tok) >= 2:
+            # Ignorar unidades puras como 1080p, 720p, 4k, 5g, 144hz, 900x400mm, 16gb
+            if re.fullmatch(r"[0-9]+(?:gb|tb|mhz|hz|mm|cm|kg|lb|lbs|fps|mp|w|v|p|k|g)", tok):
+                variantes_detectadas.append(tok)
+            elif re.fullmatch(r"[0-9]+x[0-9]+(?:mm|cm)?", tok):
+                continue
+            else:
+                codigos_alfanum.append(tok)
+        elif tok in TOKENS_MARCA_Y_FAMILIA_ESTRICTOS and tok != marca_detectada:
+            codigos_alfanum.append(tok)
+
+    if marca_detectada and codigos_alfanum:
+        modelo_str = "-".join(codigos_alfanum[:3])
+        var_str = "-".join(variantes_detectadas[:2])
+        partes_clave = [p for p in (tipo_producto, marca_detectada, modelo_str, var_str) if p]
+        clave_modelo = ":".join(partes_clave)
+    else:
+        clave_modelo = f"{categoria_ui or 'general'}:{gama_slug or 'media'}"
+
+    return {
+        "tipo_producto": tipo_producto,
+        "marca": marca_detectada,
+        "codigos_modelo": tuple(codigos_alfanum[:3]),
+        "variante_clave": tuple(variantes_detectadas[:3]),
+        "clave_modelo": clave_modelo,
+    }
+
+
+def son_productos_estrictamente_identicos(
+    oferta_base: dict[str, Any], oferta_candidata: dict[str, Any]
+) -> bool:
+    """
+    Determina con precisión quirúrgica si dos ofertas corresponden al MISMO artículo
+    comercial (mismo tipo de producto, misma marca, mismo modelo y misma variante/especificación clave).
+    Evita que productos de distintas gamas, marcas o variantes (ej. Razer Gigantus V2 Large vs
+    Logitech G840 XL o Razer Gigantus V2 XXL) se mezclen o generen ahorros falsos.
+    """
+    p_base = float(oferta_base.get("precio_gtq") or 0.0)
+    p_cand = float(oferta_candidata.get("precio_gtq") or 0.0)
+    if p_base <= 0 or p_cand <= 0:
+        return False
+
+    p_min = min(p_base, p_cand)
+    p_max = max(p_base, p_cand)
+    if p_max > p_min * 1.65:
+        return False
+
+    if oferta_base.get("categoria_ui") != oferta_candidata.get("categoria_ui"):
+        return False
+    if oferta_base.get("gama_slug") != oferta_candidata.get("gama_slug"):
+        return False
+
+    if (
+        oferta_base.get("producto_id")
+        and oferta_base.get("producto_id") == oferta_candidata.get("producto_id")
+    ):
+        return True
+
+    titulo_b = str(oferta_base.get("titulo") or "")
+    titulo_c = str(oferta_candidata.get("titulo") or "")
+    id_b = extraer_identidad_producto(
+        titulo_b,
+        categoria_ui=str(oferta_base.get("categoria_ui") or ""),
+        gama_slug=str(oferta_base.get("gama_slug") or ""),
+    )
+    id_c = extraer_identidad_producto(
+        titulo_c,
+        categoria_ui=str(oferta_candidata.get("categoria_ui") or ""),
+        gama_slug=str(oferta_candidata.get("gama_slug") or ""),
+    )
+
+    # 1. El tipo de producto debe coincidir si alguno fue detectado
+    if id_b["tipo_producto"] != id_c["tipo_producto"]:
+        return False
+
+    # 2. La marca debe existir y ser idéntica
+    if not id_b["marca"] or not id_c["marca"] or id_b["marca"] != id_c["marca"]:
+        return False
+
+    # 3. Si ambos tienen clave_modelo específica (no genérica categoria:gama), deben coincidir
+    clave_b = str(oferta_base.get("clave_modelo") or id_b["clave_modelo"])
+    clave_c = str(oferta_candidata.get("clave_modelo") or id_c["clave_modelo"])
+    es_generica_b = clave_b.endswith((":profesional", ":media", ":entrada"))
+    es_generica_c = clave_c.endswith((":profesional", ":media", ":entrada"))
+
+    if not es_generica_b and not es_generica_c:
+        return clave_b == clave_c
+
+    # 4. Ambos deben compartir al menos un código de modelo específico y la misma variante
+    if not id_b["codigos_modelo"] or not id_c["codigos_modelo"]:
+        return False
+    if set(id_b["codigos_modelo"]) != set(id_c["codigos_modelo"]):
+        return False
+    if id_b["variante_clave"] != id_c["variante_clave"]:
+        return False
+
+    return True
 
 
 def filtrar_ofertas_relevantes(

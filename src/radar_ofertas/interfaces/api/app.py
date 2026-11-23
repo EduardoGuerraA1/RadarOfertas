@@ -49,6 +49,8 @@ from radar_ofertas.domain.seed_data import (
 from radar_ofertas.domain.services.filtro_relevancia import (
     extraer_especificaciones_y_gama,
     filtrar_dicts_relevantes,
+    resolver_url_saliente_segura,
+    son_productos_estrictamente_identicos,
 )
 from radar_ofertas.infrastructure.db.postgres_oferta_repository import (
     PostgresOfertaRepository,
@@ -328,41 +330,12 @@ def _extraer_tokens_comparables(titulo: str) -> set[str]:
 def _son_mismo_articulo_comparable(
     oferta_base: dict[str, Any], oferta_candidata: dict[str, Any]
 ) -> bool:
-    p_base = float(oferta_base.get("precio_gtq") or 0.0)
-    p_cand = float(oferta_candidata.get("precio_gtq") or 0.0)
-    if p_base <= 0 or p_cand <= 0:
-        return False
-
-    p_min = min(p_base, p_cand)
-    p_max = max(p_base, p_cand)
-
-    if p_max > p_min * 1.65:
-        return False
-
-    if oferta_base.get("categoria_ui") != oferta_candidata.get("categoria_ui"):
-        return False
-    if oferta_base.get("gama_slug") != oferta_candidata.get("gama_slug"):
-        return False
-
-    if (
-        oferta_base.get("producto_id")
-        and oferta_base.get("producto_id") == oferta_candidata.get("producto_id")
-    ):
-        return True
-
-    clave_b = str(oferta_base.get("clave_modelo") or "")
-    clave_c = str(oferta_candidata.get("clave_modelo") or "")
-    if clave_b and clave_b == clave_c and ":" not in clave_b:
-        return True
-
-    tokens_b = _extraer_tokens_comparables(str(oferta_base.get("titulo") or ""))
-    tokens_c = _extraer_tokens_comparables(str(oferta_candidata.get("titulo") or ""))
-    if not tokens_b or not tokens_c:
-        return False
-
-    comunes = tokens_b & tokens_c
-    min_requeridos = max(3, int(min(len(tokens_b), len(tokens_c)) * 0.6))
-    return len(comunes) >= min_requeridos
+    """
+    Delega en `son_productos_estrictamente_identicos` para garantizar que solo
+    se comparen y agrupen productos estrictamente idénticos (mismo tipo de producto,
+    misma marca, mismo código de modelo y misma variante clave como talla/capacidad).
+    """
+    return son_productos_estrictamente_identicos(oferta_base, oferta_candidata)
 
 
 def _calcular_ahorro_preciso(
@@ -608,7 +581,7 @@ def _buscar_respaldo_rapido_en_memoria(
                 "precio_gtq": precio_float,
                 "costo_envio_gtq": costo_envio,
                 "costo_real_gtq": costo_real,
-                "url": oferta.url,
+                "url": resolver_url_saliente_segura(oferta.url, slug_t, oferta.titulo),
                 "scraped_at": "Respaldo Instantáneo GT",
                 "categoria_ui": cat_item,
                 "requiere_membresia": slug_t == "pricesmart",

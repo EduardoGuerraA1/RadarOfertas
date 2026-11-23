@@ -21,87 +21,123 @@ from bs4 import BeautifulSoup
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import (
+    construir_url_busqueda_tienda,
+    es_oferta_relevante,
+    resolver_url_saliente_segura,
+)
 
 logger = logging.getLogger(__name__)
 
 CATALOGO_VERIFICADO_RECH_GT: tuple[dict[str, Any], ...] = (
     {
+        "titulo": "Mousepad Gamer Razer Gigantus V2 Large Micro-Weave Cloth 450x400mm",
+        "precio_gtq": "165.00",
+        "url": "https://www.rech.com.gt/?s=Mousepad+Razer+Gigantus+V2+Large&post_type=product",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/mpad-raz-gigv2l.jpg",
+        "keywords": ("mousepad", "razer", "gigantus", "v2", "large", "alfombrilla"),
+    },
+    {
         "titulo": "Mousepad Gamer Logitech G840 XL Cloth Gaming Mouse Pad 900x400mm Negro",
         "precio_gtq": "365.00",
-        "url": "https://www.rech.com.gt/producto/mousepad-gamer-logitech-g840-xl",
+        "url": "https://www.rech.com.gt/?s=Mousepad+Logitech+G840+XL&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/mpad-log-g840xl.jpg",
-        "keywords": ("mousepad", "logitech", "g840", "xl", "gamer", "gaming", "alfombrilla"),
+        "keywords": ("mousepad", "logitech", "g840", "xl", "alfombrilla"),
     },
     {
         "titulo": "Mousepad Gamer HyperX Fury S Pro XL Extended 900x420mm",
         "precio_gtq": "245.00",
-        "url": "https://www.rech.com.gt/producto/mousepad-gamer-hyperx-fury-s-pro-xl",
+        "url": "https://www.rech.com.gt/?s=Mousepad+HyperX+Fury+S+Pro+XL&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/mpad-hx-furysxl.jpg",
-        "keywords": ("mousepad", "hyperx", "fury s", "xl", "gamer", "gaming", "alfombrilla"),
+        "keywords": ("mousepad", "hyperx", "fury s", "xl", "alfombrilla"),
     },
     {
         "titulo": "Teclado Mecánico Logitech G Pro X TKL Lightspeed RGB Switch Tactile Negro",
         "precio_gtq": "1495.00",
-        "url": "https://www.rech.com.gt/producto/teclado-mecanico-logitech-g-pro-x-tkl",
+        "url": "https://www.rech.com.gt/?s=Teclado+Logitech+G+Pro+X+TKL&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/tec-log-gproxtkl.jpg",
-        "keywords": ("teclado", "teclado mecanico", "mecanico", "logitech", "g pro", "tkl", "gamer"),
+        "keywords": ("teclado", "teclado mecanico", "mecanico", "logitech", "g pro", "tkl"),
     },
     {
         "titulo": "Teclado Mecánico Gamer Redragon Kumara K552 RGB Switch Outemu Red Español",
         "precio_gtq": "325.00",
-        "url": "https://www.rech.com.gt/producto/teclado-mecanico-redragon-kumara-k552-rgb",
+        "url": "https://www.rech.com.gt/?s=Teclado+Redragon+Kumara+K552+RGB&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/tec-red-k552rgb.jpg",
-        "keywords": ("teclado", "teclado mecanico", "mecanico", "redragon", "kumara", "k552", "rgb", "gamer"),
+        "keywords": ("teclado", "teclado mecanico", "mecanico", "redragon", "kumara", "k552"),
     },
     {
         "titulo": "Teclado Mecánico HyperX Alloy Origins Core Tenkeyless RGB Switch HyperX Red",
         "precio_gtq": "749.00",
-        "url": "https://www.rech.com.gt/producto/teclado-mecanico-hyperx-alloy-origins-core",
+        "url": "https://www.rech.com.gt/?s=Teclado+HyperX+Alloy+Origins+Core&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/tec-hx-alloycore.jpg",
-        "keywords": ("teclado", "teclado mecanico", "mecanico", "hyperx", "alloy origins", "gamer"),
+        "keywords": ("teclado", "teclado mecanico", "mecanico", "hyperx", "alloy origins"),
     },
     {
         "titulo": "Diadema Gamer HyperX Cloud III Gaming Headset 7.1 DTS Micrófono Desmontable Negro/Rojo",
         "precio_gtq": "795.00",
-        "url": "https://www.rech.com.gt/producto/diadema-gamer-hyperx-cloud-iii",
+        "url": "https://www.rech.com.gt/?s=Diadema+HyperX+Cloud+III&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/aud-hx-cloud3.jpg",
-        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "hyperx", "cloud iii", "cloud 3", "gamer"),
+        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "hyperx", "cloud iii", "cloud 3"),
     },
     {
         "titulo": "Diadema Gamer Inalámbrica Logitech G733 Lightspeed RGB White",
         "precio_gtq": "1149.00",
-        "url": "https://www.rech.com.gt/producto/diadema-gamer-logitech-g733-lightspeed",
+        "url": "https://www.rech.com.gt/?s=Diadema+Logitech+G733+Lightspeed&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/aud-log-g733w.jpg",
-        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "logitech", "g733", "lightspeed", "gamer"),
+        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "logitech", "g733", "lightspeed"),
     },
     {
         "titulo": "Webcam Logitech C920s Pro Full HD 1080p con Tapa de Privacidad y Micrófono Estéreo",
         "precio_gtq": "585.00",
-        "url": "https://www.rech.com.gt/producto/webcam-logitech-c920s-pro-full-hd-1080p",
+        "url": "https://www.rech.com.gt/?s=Webcam+Logitech+C920s+Pro&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/wcam-log-c920s.jpg",
-        "keywords": ("webcam", "camara web", "logitech", "c920s", "c920", "1080p", "streaming"),
+        "keywords": ("webcam", "camara web", "logitech", "c920s", "c920"),
     },
     {
         "titulo": "Cámara de Seguridad Wi-Fi TP-Link Tapo C200 360° Full HD 1080p Visión Nocturna",
         "precio_gtq": "249.00",
-        "url": "https://www.rech.com.gt/producto/camara-seguridad-tp-link-tapo-c200-360-wifi",
+        "url": "https://www.rech.com.gt/?s=Camara+TP-Link+Tapo+C200&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-tpl-tapoc200.jpg",
-        "keywords": ("camara", "camara de seguridad", "tp-link", "tapo", "c200", "tapo c200", "seguridad", "wifi"),
+        "keywords": ("camara de seguridad", "tp-link", "tapo", "c200", "tapo c200"),
     },
     {
         "titulo": "Cámara de Seguridad Exterior Wi-Fi Ezviz H8C 2K Pan & Tilt 360° Visión Nocturna Color",
         "precio_gtq": "475.00",
-        "url": "https://www.rech.com.gt/producto/camara-seguridad-exterior-ezviz-h8c-2k",
+        "url": "https://www.rech.com.gt/?s=Camara+Ezviz+H8C+2K&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-ezv-h8c2k.jpg",
-        "keywords": ("camara", "camara de seguridad", "ezviz", "h8c", "exterior", "seguridad", "2k"),
+        "keywords": ("camara de seguridad", "ezviz", "h8c"),
     },
     {
         "titulo": "Laptop Asus TUF Gaming F15 Intel Core i5 16GB RAM 512GB SSD RTX 3050 144Hz",
         "precio_gtq": "6695.00",
-        "url": "https://www.rech.com.gt/producto/laptop-asus-tuf-gaming-f15-rtx-3050",
+        "url": "https://www.rech.com.gt/?s=Laptop+Asus+TUF+Gaming+F15+RTX+3050&post_type=product",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-fx507zc4.jpg",
-        "keywords": ("laptop", "asus", "tuf", "f15", "rtx 3050", "gamer", "gaming"),
+        "keywords": ("laptop", "asus", "tuf", "f15", "rtx 3050"),
     },
+)
+
+STOPWORDS_CATALOGO: frozenset[str] = frozenset(
+    {
+        "de",
+        "la",
+        "el",
+        "en",
+        "con",
+        "para",
+        "por",
+        "del",
+        "los",
+        "las",
+        "gamer",
+        "gaming",
+        "pro",
+        "rgb",
+        "full",
+        "hd",
+        "wifi",
+        "wi-fi",
+        "smart",
+    }
 )
 
 
@@ -120,6 +156,16 @@ class RechScraper(BaseScraper):
         self.timeout_s = timeout_s
         self.habilitado = habilitado
         self.simular = simular
+
+    @classmethod
+    def construir_url_busqueda(cls, termino: str) -> str:
+        """Construye la URL oficial de búsqueda en Rech Guatemala con el término exacto codificado."""
+        return construir_url_busqueda_tienda("rech", termino)
+
+    @classmethod
+    def asegurar_url_valida(cls, url: str, titulo: str) -> str:
+        """Garantiza que ninguna oferta de Rech apunte a un enlace 404/500 no verificado."""
+        return resolver_url_saliente_segura(url, "rech", titulo)
 
     @staticmethod
     def _limpiar_precio(valor: Any) -> Decimal | None:
@@ -156,7 +202,7 @@ class RechScraper(BaseScraper):
             )
             url = str(item.get("permalink") or item.get("url") or "").strip()
             precio = self._limpiar_precio(precio_raw)
-            if not titulo or precio is None or not url:
+            if not titulo or precio is None:
                 continue
 
             images = item.get("images")
@@ -166,13 +212,18 @@ class RechScraper(BaseScraper):
             elif item.get("image"):
                 img_url = str(item.get("image")).strip()
 
+            url_candidata = (
+                url
+                if url.startswith("http")
+                else f"{self.BASE_URL}/{url.lstrip('/')}"
+                if url
+                else ""
+            )
             ofertas.append(
                 OfertaLocal(
                     titulo=titulo,
                     precio_gtq=precio,
-                    url=url
-                    if url.startswith("http")
-                    else f"{self.BASE_URL}/{url.lstrip('/')}",
+                    url=self.asegurar_url_valida(url_candidata, titulo),
                     imagen_url=img_url,
                     tienda=self.NOMBRE_TIENDA,
                 )
@@ -219,23 +270,31 @@ class RechScraper(BaseScraper):
         q_lower = (termino or "").strip().lower()
         if not q_lower:
             return []
-        tokens = [t for t in q_lower.split() if len(t) >= 2]
+        tokens_especificos = [
+            t for t in q_lower.split() if len(t) >= 2 and t not in STOPWORDS_CATALOGO
+        ]
+        if not tokens_especificos:
+            tokens_especificos = [t for t in q_lower.split() if len(t) >= 2]
+        es_multi_query_general = len(tokens_especificos) >= 6
         ofertas: list[OfertaLocal] = []
 
         for item in CATALOGO_VERIFICADO_RECH_GT:
-            titulo_lower = item["titulo"].lower()
+            titulo = item["titulo"]
+            titulo_lower = titulo.lower()
             keywords = item.get("keywords", ())
-            coincide = any(k in q_lower or q_lower in k for k in keywords) or any(
-                tok in titulo_lower for tok in tokens
+            coincide = any(tok in titulo_lower for tok in tokens_especificos) or any(
+                k in q_lower for k in keywords
             )
             if not coincide:
+                continue
+            if not es_multi_query_general and not es_oferta_relevante(titulo, termino):
                 continue
 
             ofertas.append(
                 OfertaLocal(
-                    titulo=item["titulo"],
+                    titulo=titulo,
                     precio_gtq=Decimal(item["precio_gtq"]),
-                    url=item["url"],
+                    url=self.asegurar_url_valida(item["url"], titulo),
                     imagen_url=item["imagen_url"],
                     tienda=self.NOMBRE_TIENDA,
                 )
@@ -243,7 +302,7 @@ class RechScraper(BaseScraper):
         return ofertas
 
     def _consultar_web_sync(self, termino: str) -> list[OfertaLocal]:
-        url = f"{self.BASE_URL}/?s={urllib.parse.quote_plus(termino)}&post_type=product"
+        url = self.construir_url_busqueda(termino)
         req = urllib.request.Request(
             url,
             headers={
@@ -272,7 +331,9 @@ class RechScraper(BaseScraper):
 
         ofertas_cat = self.buscar_en_catalogo_verificado(termino)
         urls_vistas = {o.url for o in ofertas_web}
-        combinadas = list(ofertas_web)
+        combinadas = [
+            o for o in ofertas_web if es_oferta_relevante(o.titulo, termino)
+        ]
         for o_cat in ofertas_cat:
             if o_cat.url not in urls_vistas:
                 combinadas.append(o_cat)

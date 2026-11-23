@@ -337,7 +337,7 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
         },
         {
             "nombre": "Tera Guatemala",
-            "url": "https://www.tera.gt",
+            "url": "https://www.tera.com.gt",
             "verticales": ["computo", "gaming", "componentes"],
         },
         {
@@ -474,7 +474,7 @@ TIENDAS_OPERATIVAS_TECHUNTER: tuple[dict[str, str], ...] = (
     {"slug": "intelaf", "nombre": "Intelaf", "alias_matriz": "Intelaf", "url": "https://www.intelaf.com"},
     {"slug": "rech", "nombre": "Rech", "alias_matriz": "Rech Guatemala", "url": "https://www.rech.com.gt"},
     {"slug": "click", "nombre": "Click Guatemala", "alias_matriz": "Click Guatemala", "url": "https://www.click.gt"},
-    {"slug": "tera", "nombre": "Tera", "alias_matriz": "Tera Guatemala", "url": "https://www.tera.gt"},
+    {"slug": "tera", "nombre": "Tera", "alias_matriz": "Tera Guatemala", "url": "https://www.tera.com.gt"},
     {"slug": "office-depot", "nombre": "Office Depot", "alias_matriz": "Office Depot Guatemala", "url": "https://www.officedepot.com.gt"},
     {"slug": "istore", "nombre": "iStore", "alias_matriz": "iShop Guatemala", "url": "https://ishop.gt"},
     {"slug": "ishop", "nombre": "iShop", "alias_matriz": "iShop Guatemala", "url": "https://ishop.gt"},
@@ -534,6 +534,7 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
         "intelaf.com",
         "rech.com.gt",
         "click.gt",
+        "tera.com.gt",
         "tera.gt",
         "officedepot.com.gt",
         "ishop.gt",

@@ -293,3 +293,124 @@ def test_respaldo_rapido_en_memoria_evita_bloqueos_cuando_termino_no_esta_en_db(
     vacio = _buscar_respaldo_rapido_en_memoria(query="xyzproductoimaginario999")
     assert vacio == []
 
+
+def test_urls_salientes_seguras_rech_click_tera_redirigen_a_busqueda_oficial() -> None:
+    from radar_ofertas.domain.services.filtro_relevancia import (
+        construir_url_busqueda_tienda,
+        resolver_url_saliente_segura,
+    )
+
+    # 1. URLs sintéticas o potencialmente rotas (/producto/ o dominio antiguo tera.gt)
+    # se convierten automáticamente a la búsqueda oficial codificada de cada tienda
+    url_click = resolver_url_saliente_segura(
+        "https://www.click.gt/producto/mousepad-razer-gigantus-v2-large",
+        "click",
+        "Mousepad Gamer Razer Gigantus V2 Large",
+    )
+    assert url_click.startswith("https://www.click.gt/buscar?q=")
+    assert "Razer" in url_click and "Gigantus" in url_click
+
+    url_rech = resolver_url_saliente_segura(
+        "https://www.rech.com.gt/producto/mousepad-razer-gigantus-v2-large",
+        "rech",
+        "Mousepad Gamer Razer Gigantus V2 Large",
+    )
+    assert url_rech.startswith("https://www.rech.com.gt/?s=")
+    assert "post_type=product" in url_rech
+
+    url_tera = resolver_url_saliente_segura(
+        "https://www.tera.gt/producto/mousepad-razer-gigantus-v2-large",
+        "tera",
+        "Mousepad Gamer Razer Gigantus V2 Large",
+    )
+    assert url_tera.startswith("https://www.tera.com.gt/?s=")
+    assert "post_type=product" in url_tera
+
+    # 2. Todos los resultados de los scrapers Rech, Click y Tera entregan URLs de búsqueda válidas
+    for scraper, prefijo_esperado in (
+        (RechScraper(simular=True), "https://www.rech.com.gt/?s="),
+        (ClickScraper(simular=True), "https://www.click.gt/buscar?q="),
+        (TeraScraper(simular=True), "https://www.tera.com.gt/?s="),
+    ):
+        ofertas = asyncio.run(scraper.buscar_producto("Razer Gigantus V2 Large"))
+        assert len(ofertas) == 1
+        assert ofertas[0].url.startswith(prefijo_esperado)
+        assert "/producto/" not in ofertas[0].url
+
+    assert construir_url_busqueda_tienda("click", "Razer Gigantus V2 Large").startswith(
+        "https://www.click.gt/buscar?q="
+    )
+
+
+def test_blindaje_matching_productos_estrictamente_identicos_gigantus_v2_large() -> None:
+    from radar_ofertas.domain.services.filtro_relevancia import (
+        es_oferta_relevante,
+        filtrar_dicts_relevantes,
+        son_productos_estrictamente_identicos,
+    )
+    from radar_ofertas.interfaces.api.app import _calcular_ahorro_preciso
+
+    query_exacta = "Mousepad Razer Gigantus V2 Large"
+
+    # Solo el producto idéntico (mismo tipo=mousepad, marca=razer, modelo=gigantus v2, talla=large) pasa el filtro
+    assert es_oferta_relevante(
+        "Mousepad Gamer Razer Gigantus V2 Large Tela Micro-Tejida", query_exacta
+    ) is True
+    assert es_oferta_relevante(
+        "Mousepad Gamer Logitech G840 XL Cloth 900x400mm", query_exacta
+    ) is False
+    assert es_oferta_relevante(
+        "Mousepad Gamer HyperX Fury S Pro Speed Edition XL", query_exacta
+    ) is False
+    assert es_oferta_relevante(
+        "Mousepad Gamer Razer Gigantus V2 Medium", query_exacta
+    ) is False
+    assert es_oferta_relevante(
+        "Teclado Mecanico Razer BlackWidow V4 Green Switch RGB", query_exacta
+    ) is False
+
+    # Comparación estricta entre ofertas de distintas tiendas
+    gigantus_rech = {
+        "titulo": "Mousepad Gamer Razer Gigantus V2 Large Tela Micro-Tejida",
+        "tienda_slug": "rech",
+        "precio_gtq": 165.00,
+        "categoria_ui": "computo",
+        "gama_slug": "entrada",
+    }
+    gigantus_click = {
+        "titulo": "Mousepad Gamer Razer Gigantus V2 Large Base Antideslizante",
+        "tienda_slug": "click",
+        "precio_gtq": 185.00,
+        "categoria_ui": "computo",
+        "gama_slug": "entrada",
+    }
+    gigantus_medium_otro = {
+        "titulo": "Mousepad Gamer Razer Gigantus V2 Medium",
+        "tienda_slug": "tera",
+        "precio_gtq": 125.00,
+        "categoria_ui": "computo",
+        "gama_slug": "entrada",
+    }
+    logitech_g840 = {
+        "titulo": "Mousepad Gamer Logitech G840 XL Cloth",
+        "tienda_slug": "kemik",
+        "precio_gtq": 395.00,
+        "categoria_ui": "computo",
+        "gama_slug": "media",
+    }
+
+    assert son_productos_estrictamente_identicos(gigantus_rech, gigantus_click) is True
+    assert son_productos_estrictamente_identicos(gigantus_rech, gigantus_medium_otro) is False
+    assert son_productos_estrictamente_identicos(gigantus_rech, logitech_g840) is False
+
+    # El cálculo de ahorro solo cruza los dos Razer Gigantus V2 Large (185 - 165 = Q20.00)
+    # e ignora por completo el Logitech G840 XL de Q395.00
+    lote = [gigantus_rech, gigantus_click, logitech_g840]
+    filtrados = filtrar_dicts_relevantes(lote, query_exacta)
+    assert len(filtrados) == 2
+    ahorro = _calcular_ahorro_preciso(filtrados, query=query_exacta)
+    assert ahorro == 20.00
+    assert gigantus_rech["ahorro_gtq"] == 20.00
+    assert gigantus_click["ahorro_gtq"] == 0.0
+
+

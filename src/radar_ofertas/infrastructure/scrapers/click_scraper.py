@@ -20,6 +20,11 @@ from bs4 import BeautifulSoup
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import (
+    construir_url_busqueda_tienda,
+    es_oferta_relevante,
+    resolver_url_saliente_segura,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,80 +32,111 @@ CATALOGO_VERIFICADO_CLICK_GT: tuple[dict[str, Any], ...] = (
     {
         "titulo": "Mousepad Gamer Razer Gigantus V2 Large Micro-Weave Cloth 450x400mm",
         "precio_gtq": "175.00",
-        "url": "https://www.click.gt/producto/mousepad-gamer-razer-gigantus-v2-large",
+        "url": "https://www.click.gt/buscar?q=Mousepad+Razer+Gigantus+V2+Large",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/mpad-raz-gigv2l.jpg",
-        "keywords": ("mousepad", "razer", "gigantus", "gamer", "gaming", "alfombrilla"),
+        "keywords": ("mousepad", "razer", "gigantus", "v2", "large", "alfombrilla"),
     },
     {
         "titulo": "Mousepad Gamer Logitech G840 XL Cloth Gaming Mouse Pad 900x400mm",
         "precio_gtq": "379.00",
-        "url": "https://www.click.gt/producto/mousepad-gamer-logitech-g840-xl",
+        "url": "https://www.click.gt/buscar?q=Mousepad+Logitech+G840+XL",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/mpad-log-g840xl.jpg",
-        "keywords": ("mousepad", "logitech", "g840", "xl", "gamer", "gaming", "alfombrilla"),
+        "keywords": ("mousepad", "logitech", "g840", "xl", "alfombrilla"),
     },
     {
         "titulo": "Teclado Mecánico Razer BlackWidow V4 Green Switch Chroma RGB",
         "precio_gtq": "1395.00",
-        "url": "https://www.click.gt/producto/teclado-mecanico-razer-blackwidow-v4",
+        "url": "https://www.click.gt/buscar?q=Teclado+Razer+BlackWidow+V4",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/tec-raz-bwv4.jpg",
-        "keywords": ("teclado", "teclado mecanico", "mecanico", "razer", "blackwidow", "rgb", "gamer"),
+        "keywords": ("teclado", "teclado mecanico", "mecanico", "razer", "blackwidow"),
     },
     {
         "titulo": "Teclado Mecánico Inalámbrico Keychron K2 Wireless Bluetooth Hot-Swappable RGB",
         "precio_gtq": "795.00",
-        "url": "https://www.click.gt/producto/teclado-mecanico-keychron-k2-wireless",
+        "url": "https://www.click.gt/buscar?q=Teclado+Keychron+K2+Wireless",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/tec-key-k2w.jpg",
-        "keywords": ("teclado", "teclado mecanico", "mecanico", "keychron", "k2", "wireless", "bluetooth"),
+        "keywords": ("teclado", "teclado mecanico", "mecanico", "keychron", "k2"),
     },
     {
         "titulo": "Diadema Gamer Razer BlackShark V2 X Multiplataforma 7.1 Surround Sound",
         "precio_gtq": "445.00",
-        "url": "https://www.click.gt/producto/diadema-gamer-razer-blackshark-v2-x",
+        "url": "https://www.click.gt/buscar?q=Diadema+Razer+BlackShark+V2+X",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/aud-raz-bsv2x.jpg",
-        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "razer", "blackshark", "gamer"),
+        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "razer", "blackshark"),
     },
     {
         "titulo": "Diadema Gamer Inalámbrica Logitech G435 Lightspeed & Bluetooth Ultra Ligera",
         "precio_gtq": "595.00",
-        "url": "https://www.click.gt/producto/diadema-gamer-logitech-g435-bluetooth",
+        "url": "https://www.click.gt/buscar?q=Diadema+Logitech+G435+Bluetooth",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/aud-log-g435b.jpg",
-        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "logitech", "g435", "bluetooth", "gamer"),
+        "keywords": ("diadema", "diadema gamer", "headset", "audifonos", "logitech", "g435"),
     },
     {
         "titulo": "Webcam Logitech Brio 4K Ultra HD con HDR, Windows Hello y Doble Micrófono",
         "precio_gtq": "1499.00",
-        "url": "https://www.click.gt/producto/webcam-logitech-brio-4k-ultra-hd",
+        "url": "https://www.click.gt/buscar?q=Webcam+Logitech+Brio+4K",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/wcam-log-brio4k.jpg",
-        "keywords": ("webcam", "camara web", "logitech", "brio", "4k", "streaming"),
+        "keywords": ("webcam", "camara web", "logitech", "brio"),
     },
     {
         "titulo": "Webcam Logitech C920s Pro Full HD 1080p con Tapa de Privacidad",
         "precio_gtq": "599.00",
-        "url": "https://www.click.gt/producto/webcam-logitech-c920s-pro-full-hd",
+        "url": "https://www.click.gt/buscar?q=Webcam+Logitech+C920s+Pro",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/wcam-log-c920s.jpg",
-        "keywords": ("webcam", "camara web", "logitech", "c920s", "c920", "1080p", "streaming"),
+        "keywords": ("webcam", "camara web", "logitech", "c920s", "c920"),
+    },
+    {
+        "titulo": "Cámara de Seguridad Wi-Fi TP-Link Tapo C200 360° Full HD 1080p Visión Nocturna",
+        "precio_gtq": "255.00",
+        "url": "https://www.click.gt/buscar?q=Camara+TP-Link+Tapo+C200",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-tpl-tapoc200.jpg",
+        "keywords": ("camara de seguridad", "tp-link", "tapo", "c200", "tapo c200"),
     },
     {
         "titulo": "Cámara de Seguridad Wi-Fi TP-Link Tapo C210 Pan/Tilt 2K 3MP Visión Nocturna",
         "precio_gtq": "295.00",
-        "url": "https://www.click.gt/producto/camara-seguridad-tp-link-tapo-c210-2k-3mp",
+        "url": "https://www.click.gt/buscar?q=Camara+TP-Link+Tapo+C210+2K",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-tpl-tapoc210.jpg",
-        "keywords": ("camara", "camara de seguridad", "tp-link", "tapo", "c210", "tapo c210", "2k", "seguridad"),
+        "keywords": ("camara de seguridad", "tp-link", "tapo", "c210", "tapo c210"),
     },
     {
         "titulo": "Cámara de Seguridad Smart Wi-Fi Ezviz C6N 1080p Rotación 360° Seguimiento Inteligente",
         "precio_gtq": "269.00",
-        "url": "https://www.click.gt/producto/camara-seguridad-ezviz-c6n-1080p-360",
+        "url": "https://www.click.gt/buscar?q=Camara+Ezviz+C6N+1080p",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-ezv-c6n.jpg",
-        "keywords": ("camara", "camara de seguridad", "ezviz", "c6n", "ezviz c6n", "360", "seguridad"),
+        "keywords": ("camara de seguridad", "ezviz", "c6n", "ezviz c6n"),
     },
     {
         "titulo": "Laptop Lenovo LOQ 15 Intel Core i5 16GB RAM 512GB SSD NVIDIA GeForce RTX 4050",
         "precio_gtq": "7499.00",
-        "url": "https://www.click.gt/producto/laptop-lenovo-loq-15-rtx-4050",
+        "url": "https://www.click.gt/buscar?q=Laptop+Lenovo+LOQ+15+RTX+4050",
         "imagen_url": "https://www.intelaf.com/images/productos/gran/len-loq-15irx9.jpg",
-        "keywords": ("laptop", "lenovo", "loq", "rtx 4050", "gamer", "gaming"),
+        "keywords": ("laptop", "lenovo", "loq", "rtx 4050"),
     },
+)
+
+STOPWORDS_CATALOGO: frozenset[str] = frozenset(
+    {
+        "de",
+        "la",
+        "el",
+        "en",
+        "con",
+        "para",
+        "por",
+        "del",
+        "los",
+        "las",
+        "gamer",
+        "gaming",
+        "pro",
+        "rgb",
+        "full",
+        "hd",
+        "wifi",
+        "wi-fi",
+        "smart",
+    }
 )
 
 
@@ -119,6 +155,16 @@ class ClickScraper(BaseScraper):
         self.timeout_s = timeout_s
         self.habilitado = habilitado
         self.simular = simular
+
+    @classmethod
+    def construir_url_busqueda(cls, termino: str) -> str:
+        """Construye la URL oficial de búsqueda en Click Guatemala (`https://www.click.gt/buscar?q=...`)."""
+        return construir_url_busqueda_tienda("click", termino)
+
+    @classmethod
+    def asegurar_url_valida(cls, url: str, titulo: str) -> str:
+        """Garantiza que ninguna oferta de Click Guatemala apunte a un enlace 404/500 no verificado."""
+        return resolver_url_saliente_segura(url, "click", titulo)
 
     @staticmethod
     def _limpiar_precio(valor: Any) -> Decimal | None:
@@ -150,15 +196,20 @@ class ClickScraper(BaseScraper):
             precio_raw = item.get("price") or item.get("final_price")
             url = str(item.get("url") or item.get("permalink") or "").strip()
             precio = self._limpiar_precio(precio_raw)
-            if not titulo or precio is None or not url:
+            if not titulo or precio is None:
                 continue
+            url_candidata = (
+                url
+                if url.startswith("http")
+                else f"{self.BASE_URL}/{url.lstrip('/')}"
+                if url
+                else ""
+            )
             ofertas.append(
                 OfertaLocal(
                     titulo=titulo,
                     precio_gtq=precio,
-                    url=url
-                    if url.startswith("http")
-                    else f"{self.BASE_URL}/{url.lstrip('/')}",
+                    url=self.asegurar_url_valida(url_candidata, titulo),
                     imagen_url=str(item.get("image") or "").strip() or None,
                     tienda=self.NOMBRE_TIENDA,
                 )
@@ -205,22 +256,31 @@ class ClickScraper(BaseScraper):
         q_lower = (termino or "").strip().lower()
         if not q_lower:
             return []
-        tokens = [t for t in q_lower.split() if len(t) >= 2]
+        tokens_especificos = [
+            t for t in q_lower.split() if len(t) >= 2 and t not in STOPWORDS_CATALOGO
+        ]
+        if not tokens_especificos:
+            tokens_especificos = [t for t in q_lower.split() if len(t) >= 2]
+        es_multi_query_general = len(tokens_especificos) >= 6
         ofertas: list[OfertaLocal] = []
 
         for item in CATALOGO_VERIFICADO_CLICK_GT:
-            titulo_lower = item["titulo"].lower()
+            titulo = item["titulo"]
+            titulo_lower = titulo.lower()
             keywords = item.get("keywords", ())
-            coincide = any(k in q_lower or q_lower in k for k in keywords) or any(
-                tok in titulo_lower for tok in tokens
+            coincide = any(tok in titulo_lower for tok in tokens_especificos) or any(
+                k in q_lower for k in keywords
             )
             if not coincide:
                 continue
+            if not es_multi_query_general and not es_oferta_relevante(titulo, termino):
+                continue
+
             ofertas.append(
                 OfertaLocal(
-                    titulo=item["titulo"],
+                    titulo=titulo,
                     precio_gtq=Decimal(item["precio_gtq"]),
-                    url=item["url"],
+                    url=self.asegurar_url_valida(item["url"], titulo),
                     imagen_url=item["imagen_url"],
                     tienda=self.NOMBRE_TIENDA,
                 )
@@ -228,7 +288,7 @@ class ClickScraper(BaseScraper):
         return ofertas
 
     def _consultar_web_sync(self, termino: str) -> list[OfertaLocal]:
-        url = f"{self.BASE_URL}/?s={urllib.parse.quote_plus(termino)}&post_type=product"
+        url = self.construir_url_busqueda(termino)
         req = urllib.request.Request(
             url,
             headers={
@@ -257,7 +317,9 @@ class ClickScraper(BaseScraper):
 
         ofertas_cat = self.buscar_en_catalogo_verificado(termino)
         urls_vistas = {o.url for o in ofertas_web}
-        combinadas = list(ofertas_web)
+        combinadas = [
+            o for o in ofertas_web if es_oferta_relevante(o.titulo, termino)
+        ]
         for o_cat in ofertas_cat:
             if o_cat.url not in urls_vistas:
                 combinadas.append(o_cat)

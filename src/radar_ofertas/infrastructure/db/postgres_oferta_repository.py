@@ -22,6 +22,7 @@ from radar_ofertas.domain.repositories.oferta_repository import OfertaRepository
 from radar_ofertas.domain.services.filtro_relevancia import (
     extraer_especificaciones_y_gama,
     filtrar_dicts_relevantes,
+    resolver_url_saliente_segura,
 )
 
 load_dotenv()
@@ -179,7 +180,7 @@ class PostgresOfertaRepository(OfertaRepository):
             "intelaf": "https://www.intelaf.com",
             "rech": "https://www.rech.com.gt",
             "click": "https://www.click.gt",
-            "tera": "https://www.tera.gt",
+            "tera": "https://www.tera.com.gt",
             "cemaco": "https://www.cemaco.com",
             "epa": "https://gt.epaenlinea.com",
             "novex": "https://www.novex.com.gt",
@@ -550,7 +551,7 @@ class PostgresOfertaRepository(OfertaRepository):
                 marca,
                 categoria_id,
                 oferta.imagen_url or None,
-                oferta.url,
+                resolver_url_saliente_segura(oferta.url, oferta.tienda, oferta.titulo),
             ),
         )
         nuevo = cursor.fetchone()
@@ -633,6 +634,9 @@ class PostgresOfertaRepository(OfertaRepository):
 
                         costo_envio = Decimal("0.00") if envio_gratis else tarifa_envio
                         costo_real_gtq = precio_nativo + costo_envio
+                        url_segura = resolver_url_saliente_segura(
+                            oferta.url, oferta.tienda, oferta.titulo
+                        )
 
                         cursor.execute(
                             """
@@ -656,7 +660,7 @@ class PostgresOfertaRepository(OfertaRepository):
                                 envio_gratis,
                                 costo_envio,
                                 costo_real_gtq,
-                                oferta.url,
+                                url_segura,
                             ),
                         )
                         insertados += 1
@@ -777,6 +781,9 @@ class PostgresOfertaRepository(OfertaRepository):
                 titulo_str, precio_gtq=precio_float, categoria_ui=cat_ui
             )
             marca_str = str(fila[2] or "") or (self._inferir_marca(titulo_str) or "Oficial GT")
+            url_segura = resolver_url_saliente_segura(
+                str(fila[9]), slug_tienda_str, titulo_str
+            )
             resultados.append(
                 {
                     "producto_id": str(fila[0]),
@@ -788,7 +795,7 @@ class PostgresOfertaRepository(OfertaRepository):
                     "precio_gtq": precio_float,
                     "costo_envio_gtq": float(fila[7]),
                     "costo_real_gtq": float(fila[8]),
-                    "url": str(fila[9]),
+                    "url": url_segura,
                     "scraped_at": str(fila[10]),
                     "categoria_ui": cat_ui,
                     "requiere_membresia": slug_tienda_str == "pricesmart",
