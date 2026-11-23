@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>tecHunter GT v5.2 — El mejor precio. Ya calculado con envío.</title>
+  <title>tecHunter GT v5.3 — El mejor precio. Ya calculado con envío.</title>
   {% if ga_measurement_id %}
   <!-- Google Analytics 4 (GA4) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
@@ -14,57 +14,17 @@
     gtag('config', '{{ ga_measurement_id }}');
   </script>
   {% endif %}
-  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            apple: {
-              bg: '#FBFBFD',
-              surface: '#F5F5F7',
-              border: '#E5E7EB',
-              ink: '#111827',
-              muted: '#6B7280',
-              emerald: '#059669',
-            }
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body {
-      background-color: #FFFFFF;
-      color: #111827;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    .tabular-nums {
-      font-variant-numeric: tabular-nums;
-    }
-    .apple-search-shadow {
-      box-shadow: 0 10px 32px -8px rgba(17, 24, 39, 0.08), 0 2px 6px -1px rgba(17, 24, 39, 0.04);
-    }
-    .apple-card {
-      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
-    }
-    .apple-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 18px 38px -12px rgba(17, 24, 39, 0.09), 0 4px 12px -2px rgba(17, 24, 39, 0.04);
-    }
-  </style>
+  <!-- CSS Estático y Minificado v5.3 (Cero compilación Tailwind CDN en runtime) -->
+  <link rel="stylesheet" href="/static/styles.css?v=5.3.0" />
+  <!-- Iconos secundarios con defer (los iconos críticos above-the-fold son SVGs inline ultraligeros) -->
+  <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
-<body class="min-h-screen flex flex-col selection:bg-emerald-500/15 selection:text-emerald-900">
+<body class="min-h-screen flex flex-col">
 
-  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.2) -->
+  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.3 App Shell) -->
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-gray-200/80">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       <!-- Brand -->
@@ -78,7 +38,7 @@
         </div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-base font-bold tracking-tight text-gray-950">tec<span class="text-emerald-600">Hunter</span></span>
-          <span class="text-xs font-medium text-gray-400">GT v5.2</span>
+          <span class="text-xs font-medium text-gray-400">GT v5.3</span>
         </div>
       </a>
 
@@ -86,7 +46,7 @@
       <div class="flex items-center gap-2 sm:gap-2.5">
         <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100/90 border border-gray-200/80 text-xs font-medium text-gray-700">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Neon DB · Sync 3x/día</span>
+          <span>App Shell &lt;100ms · Cache 5m</span>
         </div>
         <div class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100/90 border border-gray-200/80 text-xs font-medium text-gray-700 tabular-nums">
           <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -94,7 +54,7 @@
             <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
           </svg>
-          <span>{{ resumen.total }} productos</span>
+          <span id="header-total-count">{{ resumen.total }} productos</span>
         </div>
         {% if es_admin %}
         <a
@@ -112,7 +72,7 @@
 
   <!-- Main Content -->
   <main class="flex-1">
-    <!-- Hero & Instant Neon DB Search Capsule Section -->
+    <!-- Hero & Instant Neon DB + Live Search Capsule Section -->
     <section class="pt-10 pb-7 sm:pt-14 sm:pb-9 px-4 sm:px-6 lg:px-8 border-b border-gray-200/80">
       <div class="max-w-4xl mx-auto text-center">
         <p class="text-xs sm:text-sm font-medium text-gray-500 tracking-wide mb-3">
@@ -126,8 +86,8 @@
           Consulta en milisegundos precios precargados de Rech, Click Guatemala, Tera, Intelaf, Kemik, iStore, EPA, Novex, Office Depot, Tigo, Tropigas, Tecno Fácil, La Curacao, Claro, PriceSmart, Max, Pacifiko, Siman, Walmart y Cemaco.
         </p>
 
-        <!-- Search Bar Capsule (100% Instant Neon DB Read — Zero 502 Timeout Risk) -->
-        <form id="search-form" action="/" method="get" class="mt-7 max-w-2xl mx-auto">
+        <!-- Search Bar Capsule (Instant Neon DB + Live Store Scan Button — Zero 502 Timeout Risk) -->
+        <form id="search-form" action="/" method="get" class="mt-7 max-w-3xl mx-auto">
           <input type="hidden" name="tienda" value="{{ tienda_activa }}" />
           <input type="hidden" name="cat" value="{{ categoria_activa }}" />
           <input type="hidden" name="gama" value="{{ gama_activa }}" />
@@ -143,7 +103,7 @@
                 type="text"
                 name="q"
                 value="{{ query }}"
-                placeholder="Buscar MacBook Air M2, Teclado Mecánico, Diadema HyperX, Cámara Tapo C200, Taladro..."
+                placeholder="Buscar MacBook Air M2, Mousepad Razer Gigantus V2 Large, Teclado Mecánico, Cámara Tapo C200..."
                 class="w-full bg-transparent text-sm sm:text-base text-gray-900 placeholder-gray-400 focus:outline-none"
               />
               {% if query %}
@@ -157,7 +117,7 @@
               {% endif %}
             </div>
 
-            <div class="flex items-center gap-1.5 shrink-0">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 shrink-0">
               <button
                 type="submit"
                 class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold shadow-sm transition-colors"
@@ -168,6 +128,19 @@
                 </svg>
                 <span>Buscar en Neon DB</span>
               </button>
+
+              <button
+                id="btn-buscar-en-vivo"
+                type="button"
+                onclick="dispararBusquedaEnVivoDesdeInput()"
+                title="Consulta en paralelo los catálogos en vivo de las tiendas de Guatemala (máx. 6s) y guarda en Neon DB"
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-200 text-xs sm:text-sm font-semibold transition-colors"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                <span>Buscar en vivo en tiendas</span>
+              </button>
             </div>
           </div>
         </form>
@@ -175,7 +148,7 @@
         <!-- Quick Seed Search Suggestions -->
         <div class="mt-3.5 flex flex-wrap items-center justify-center gap-1.5 text-xs text-gray-500">
           <span class="text-gray-400">Búsquedas semilla populares:</span>
-          {% for sugerencia in ['MacBook', 'Teclado Mecánico', 'Diadema HyperX', 'Mousepad', 'Webcam', 'Tapo C200', 'Ezviz', 'iPhone', 'Taladro'] %}
+          {% for sugerencia in ['MacBook', 'Mousepad Razer Gigantus V2 Large', 'Teclado Mecánico', 'Diadema HyperX', 'Webcam', 'Tapo C200', 'Ezviz', 'iPhone', 'Taladro'] %}
           <a
             href="/?q={{ sugerencia | urlencode }}"
             class="px-2.5 py-0.5 rounded-full bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 font-medium transition-colors"
@@ -206,7 +179,7 @@
           >
             <span>{{ icono_cat }}</span>
             <span>{{ etiqueta_cat }}</span>
-            <span class="text-[11px] tabular-nums {% if cat_activa %}text-gray-300{% else %}text-gray-400{% endif %}">{{ conteo_cat }}</span>
+            <span data-cat-count="{{ slug_cat or 'all' }}" class="text-[11px] tabular-nums {% if cat_activa %}text-gray-300{% else %}text-gray-400{% endif %}">{{ conteo_cat }}</span>
           </a>
           {% endfor %}
         </div>
@@ -216,24 +189,40 @@
     <!-- Results Container -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-      {% if error_db %}
-      <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <p class="font-semibold">⚡ Modo de Resiliencia Instantánea activado</p>
-        <p class="mt-1 text-xs">Mostrando catálogo de respaldo verificado en milisegundos mientras reconectamos con Neon DB.</p>
-      </div>
-      {% elif respaldo_rapido_activo %}
-      <div class="mb-6 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 text-xs sm:text-sm text-emerald-900 flex items-center justify-between gap-3">
+      <!-- Dynamic Status Banner (Respaldo Rápido / Resultado de Búsqueda en Vivo) -->
+      <div id="live-search-status-banner" class="hidden mb-6 rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 text-xs sm:text-sm text-emerald-900 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-          <span><strong>⚡ Respaldo rápido activado:</strong> Mostrando referencias verificadas en milisegundos para tu búsqueda sin tiempos de espera.</span>
+          <span id="live-search-status-text"></span>
         </div>
       </div>
-      {% endif %}
+
+      <!-- Animated Live Store Scan Progress Panel (AJAX / Fetch anti-502 — 6s max) -->
+      <div id="live-search-animation" class="hidden mb-7 rounded-3xl border border-emerald-200 bg-gradient-to-r from-emerald-50/50 via-white to-[#F5F5F7] p-6 sm:p-8 shadow-sm">
+        <div class="max-w-2xl mx-auto text-center space-y-3">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100/80 text-emerald-800 text-xs font-semibold">
+            <svg class="w-4 h-4 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2.5" stroke-opacity="0.25"></circle>
+              <path d="M12 3a9 9 0 019 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path>
+            </svg>
+            <span>Motor Asíncrono Paralelo · Timeout Estricto 6s</span>
+          </div>
+          <h3 id="live-search-headline" class="text-lg sm:text-xl font-bold text-gray-950 tracking-tight">
+            Consultando catálogos en vivo en Guatemala...
+          </h3>
+          <p class="text-xs sm:text-sm text-gray-600">
+            Escaneando en paralelo Rech, Click Guatemala, Tera, Intelaf, Kemik, Pacifiko, Tiendas Max, iStore, EPA, Novex, Office Depot, Tigo y Tropigas. Los precios verificados se guardarán automáticamente en Neon DB.
+          </p>
+          <div class="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+            <div id="live-search-progress-fill" class="h-2.5 bg-emerald-600 rounded-full live-progress-bar"></div>
+          </div>
+        </div>
+      </div>
 
       <!-- Results Header + Sort Selector -->
       <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-5">
         <div>
-          <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">
+          <h2 id="results-title" class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">
             {% if query %}
               Resultados para “{{ query }}”
             {% elif categoria_activa == 'computo' %}
@@ -250,25 +239,21 @@
               Catálogo general en tiempo real
             {% endif %}
           </h2>
-          <p class="text-xs sm:text-sm text-gray-500 mt-0.5 tabular-nums">
-            {{ ofertas | length }} ofertas · ordenadas por {% if orden_activo == 'base' %}precio de lista{% else %}precio final con envío{% endif %}
-            {% if resumen.ahorro_maximo_gtq > 0 %}
-              · <span class="text-emerald-600 font-medium">Ahorro verificado en el mismo producto: Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</span>
-            {% endif %}
+          <p id="results-subtitle" class="text-xs sm:text-sm text-gray-500 mt-0.5 tabular-nums">
+            Cargando ofertas destacadas desde Neon DB...
           </p>
         </div>
 
         <!-- Sort Dropdown & Gama Precision Filter -->
         <div class="flex flex-wrap items-center gap-2">
-          <!-- Gama Precision Pills (Motor de Precisión de Modelos) -->
           {% set gamas_disponibles = [
-            ('', 'Todas las gamas', resumen.total),
-            ('profesional', 'Profesional · Alta Gama', resumen.conteo_gamas.profesional if resumen.conteo_gamas is defined else 0),
-            ('media', 'Media · Productividad', resumen.conteo_gamas.media if resumen.conteo_gamas is defined else 0),
-            ('entrada', 'Entrada · Básica', resumen.conteo_gamas.entrada if resumen.conteo_gamas is defined else 0),
+            ('', 'Todas las gamas'),
+            ('profesional', 'Profesional · Alta Gama'),
+            ('media', 'Media · Productividad'),
+            ('entrada', 'Entrada · Básica'),
           ] %}
           <div class="flex flex-wrap items-center gap-1.5 bg-gray-100/90 p-1 rounded-full border border-gray-200/80">
-            {% for slug_gama, label_gama, count_gama in gamas_disponibles %}
+            {% for slug_gama, label_gama in gamas_disponibles %}
             {% set es_gama_activa = (gama_activa == slug_gama) %}
             <a
               href="/?q={{ query | urlencode }}&cat={{ categoria_activa }}&tienda={{ tienda_activa }}&gama={{ slug_gama }}&orden={{ orden_activo }}"
@@ -300,7 +285,7 @@
         </div>
       </div>
 
-      <!-- Store Filter Pills with Live Stock Counters (24 Tiendas en v5.2) -->
+      <!-- Store Filter Pills with Live Stock Counters (24 Tiendas en v5.3) -->
       {% set filtros_tienda = [
         ('rech', 'Rech', resumen.total_rech | default(0), 'bg-purple-600'),
         ('click', 'Click GT', resumen.total_click | default(0), 'bg-cyan-600'),
@@ -338,7 +323,7 @@
             {% endif %}"
         >
           <span>Todas</span>
-          <span class="tabular-nums {% if not tienda_activa %}text-gray-300{% else %}text-gray-400{% endif %}">{{ resumen.total }}</span>
+          <span data-store-count="all" class="tabular-nums {% if not tienda_activa %}text-gray-300{% else %}text-gray-400{% endif %}">{{ resumen.total }}</span>
         </a>
 
         {% for slug, etiqueta, cantidad, dot_color in filtros_tienda %}
@@ -355,7 +340,7 @@
         >
           <span class="w-1.5 h-1.5 rounded-full {{ dot_color }}"></span>
           <span>{{ etiqueta }}</span>
-          <span class="tabular-nums text-[11px] {% if tienda_activa == slug %}text-gray-300{% else %}text-gray-400{% endif %}">{{ cantidad }}</span>
+          <span data-store-count="{{ slug }}" class="tabular-nums text-[11px] {% if tienda_activa == slug %}text-gray-300{% else %}text-gray-400{% endif %}">{{ cantidad }}</span>
         </a>
         {% endfor %}
 
@@ -371,7 +356,7 @@
 
       <!-- Native Ad 1: Z-Tech Imports GT (ztechgt.com) -->
       {% if destacar_ztech %}
-      <aside class="mb-7 rounded-2xl border border-gray-200 bg-gradient-to-r from-[#F5F5F7] via-white to-emerald-50/40 p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <aside id="ztech-banner" class="mb-7 rounded-2xl border border-gray-200 bg-gradient-to-r from-[#F5F5F7] via-white to-emerald-50/40 p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div class="space-y-1.5 max-w-2xl">
           <div class="inline-flex items-center gap-2">
             <span class="px-2.5 py-0.5 rounded-full bg-gray-950 text-white text-[10px] font-semibold uppercase tracking-wider">
@@ -399,194 +384,83 @@
       </aside>
       {% endif %}
 
-      <!-- Product Cards Grid (3 Columns — Estilo Apple / Quiet Luxury) -->
-      {% if ofertas %}
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for oferta in ofertas %}
-        {% set es_mejor_precio = (loop.index == 1) %}
-        {% set ahorro_item = oferta.ahorro_gtq | default(0.0) %}
-        {% set dot_tienda = {
-          'rech': 'bg-purple-600',
-          'click': 'bg-cyan-600',
-          'tera': 'bg-indigo-600',
-          'istore': 'bg-gray-900',
-          'ishop': 'bg-gray-900',
-          'epa': 'bg-yellow-500',
-          'novex': 'bg-orange-600',
-          'intelaf': 'bg-amber-500',
-          'office-depot': 'bg-red-700',
-          'tienda-tigo': 'bg-blue-600',
-          'tropigas': 'bg-orange-700',
-          'tecno-facil': 'bg-red-500',
-          'la-curacao': 'bg-yellow-600',
-          'tienda-claro': 'bg-rose-600',
-          'pricesmart': 'bg-blue-700',
-          'tiendas-max': 'bg-orange-500',
-          'pacifiko': 'bg-sky-500',
-          'kemik': 'bg-amber-600',
-          'siman': 'bg-rose-500',
-          'cemaco': 'bg-teal-600',
-          'walmart': 'bg-blue-500',
-          'paiz': 'bg-emerald-600',
-          'maxi-despensa': 'bg-lime-600',
-          'elektra': 'bg-yellow-500',
-          'la-torre': 'bg-red-600'
-        }.get(oferta.tienda_slug, 'bg-gray-500') %}
-
-        <article
-          class="apple-card rounded-3xl bg-white flex flex-col justify-between overflow-hidden
-            {% if es_mejor_precio %}
-              border-2 border-emerald-500 ring-4 ring-emerald-500/5
-            {% else %}
-              border border-gray-200/90
-            {% endif %}"
-        >
+      <!-- Skeleton Loading Grid (App Shell Initial State — Renderizado en <100 ms) -->
+      <div id="skeleton-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-busy="true" aria-label="Cargando ofertas destacadas">
+        {% for _ in range(6) %}
+        <div class="skeleton-card rounded-3xl bg-white border border-gray-200/90 overflow-hidden flex flex-col justify-between">
           <div>
-            <!-- Top Image Container (#F5F5F7) with Best Price & Gama Badges -->
-            <div class="relative h-52 bg-[#F5F5F7] flex items-center justify-center p-6 border-b border-gray-100">
-              {% if es_mejor_precio %}
-              <div class="absolute top-3.5 left-3.5 z-10 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold shadow-sm">
-                <span>★</span>
-                <span>Mejor Precio</span>
+            <div class="h-52 skeleton-shimmer border-b border-gray-100"></div>
+            <div class="p-5 sm:p-6 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="h-3 w-20 rounded-full skeleton-shimmer"></div>
+                <div class="h-3 w-24 rounded-full skeleton-shimmer"></div>
               </div>
-              {% elif oferta.requiere_membresia %}
-              <div class="absolute top-3.5 left-3.5 z-10 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-600 text-white text-[11px] font-semibold shadow-sm">
-                <span>Socio PriceSmart</span>
-              </div>
-              {% endif %}
-
-              <!-- Gama Pill (Top Right) -->
-              <div class="absolute top-3.5 right-3.5 z-10 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-gray-200/80 text-[11px] font-medium text-gray-700 shadow-sm">
-                {{ oferta.gama or 'Media · Productividad' }}
-              </div>
-
-              {% if oferta.imagen_url %}
-              <img
-                src="{{ oferta.imagen_url }}"
-                alt="{{ oferta.titulo }}"
-                loading="lazy"
-                class="max-h-36 w-auto object-contain mix-blend-multiply transition-transform duration-300 hover:scale-105"
-                onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
-              />
-              <div class="hidden text-xs text-gray-400 font-medium">Sin vista previa</div>
-              {% else %}
-              <div class="text-xs text-gray-400 font-medium">Sin vista previa</div>
-              {% endif %}
-            </div>
-
-            <!-- Card Body -->
-            <div class="p-5 sm:p-6">
-              <!-- Brand + Store Row -->
-              <div class="flex items-center justify-between gap-2 text-xs text-gray-500 mb-1.5">
-                <span class="font-medium text-gray-500 truncate">{{ oferta.marca or 'Oficial GT' }}</span>
-                <span class="inline-flex items-center gap-1.5 font-semibold text-gray-800 shrink-0">
-                  <span class="w-2 h-2 rounded-full {{ dot_tienda }}"></span>
-                  <span>{{ oferta.tienda }}</span>
-                </span>
-              </div>
-
-              <!-- Product Title -->
-              <h3 class="text-base font-bold text-gray-950 leading-snug line-clamp-2 min-h-[2.75rem]" title="{{ oferta.titulo }}">
-                {{ oferta.titulo }}
-              </h3>
-
-              <!-- Spec Micro-Chips (Motor de Precisión) -->
-              <div class="mt-3 flex flex-wrap items-center gap-1.5">
-                {% for chip in (oferta.chips_especificaciones or []) %}
-                <span class="px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-medium">
-                  {{ chip }}
-                </span>
-                {% endfor %}
+              <div class="h-4 w-5/6 rounded-md skeleton-shimmer"></div>
+              <div class="h-4 w-3/4 rounded-md skeleton-shimmer"></div>
+              <div class="flex gap-2 pt-2">
+                <div class="h-5 w-16 rounded-md skeleton-shimmer"></div>
+                <div class="h-5 w-20 rounded-md skeleton-shimmer"></div>
               </div>
             </div>
           </div>
-
-          <!-- Price, Shipping Breakdown & CTA Footer -->
           <div class="px-5 pb-5 sm:px-6 sm:pb-6 pt-2">
-            <div class="pt-3 border-t border-gray-100">
-              <div class="flex items-baseline justify-between gap-2">
-                <span class="text-2xl sm:text-[28px] font-extrabold tracking-tight tabular-nums {% if es_mejor_precio %}text-emerald-600{% else %}text-gray-950{% endif %}">
-                  Q{{ "{:,.2f}".format(oferta.precio_gtq) }}
-                </span>
-                {% if ahorro_item > 0 %}
-                <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full tabular-nums">
-                  Ahorras Q{{ "{:,.2f}".format(ahorro_item) }}
-                </span>
-                {% endif %}
-              </div>
-
-              <!-- Shipping & Final Total Line -->
-              <div class="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 tabular-nums">
-                <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                </svg>
-                {% if oferta.costo_envio_gtq <= 0 %}
-                  <span>Envío gratis · <strong class="font-semibold text-gray-700">Total Q{{ "{:,.2f}".format(oferta.costo_real_gtq) }}</strong></span>
-                {% else %}
-                  <span>Envío Q{{ "{:,.2f}".format(oferta.costo_envio_gtq) }} · <strong class="font-semibold text-gray-700">Total Q{{ "{:,.2f}".format(oferta.costo_real_gtq) }}</strong></span>
-                {% endif %}
-              </div>
+            <div class="pt-3 border-t border-gray-100 space-y-2">
+              <div class="h-7 w-32 rounded-lg skeleton-shimmer"></div>
+              <div class="h-3 w-40 rounded-full skeleton-shimmer"></div>
             </div>
-
-            <!-- Action Button with Outbound Click Analytics -->
-            <a
-              href="{{ oferta.url }}"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-tienda="{{ oferta.tienda }}"
-              data-titulo="{{ oferta.titulo }}"
-              data-precio="{{ oferta.precio_gtq }}"
-              onclick="techunterTrackOutbound(this)"
-              class="mt-4 w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all
-                {% if es_mejor_precio %}
-                  bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm
-                {% else %}
-                  bg-gray-100 hover:bg-gray-950 text-gray-900 hover:text-white
-                {% endif %}"
-            >
-              <span>Ir a la tienda</span>
-              <span>↗</span>
-            </a>
+            <div class="mt-4 h-10 w-full rounded-full skeleton-shimmer"></div>
           </div>
-        </article>
+        </div>
         {% endfor %}
       </div>
 
-      {% else %}
-      <!-- Friendly Non-Blocking Empty State (Zero Freeze / Zero 502) -->
-      <div class="rounded-3xl border border-gray-200 bg-[#F5F5F7]/70 p-8 sm:p-12 text-center max-w-2xl mx-auto my-6">
+      <!-- Dynamic Product Cards Grid (Poblado asíncronamente por fetch GET /api/ofertas o POST /api/buscar-en-vivo) -->
+      <div id="ofertas-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+      <!-- Friendly Non-Blocking Empty State with Instant Live Search Trigger -->
+      <div id="empty-state-panel" class="hidden rounded-3xl border border-gray-200 bg-[#F5F5F7]/70 p-8 sm:p-12 text-center max-w-2xl mx-auto my-6">
         <div class="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center mx-auto mb-4 text-emerald-600 shadow-sm">
           <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.2-5.2m1.7-4.3a6 6 0 11-12 0 6 6 0 0112 0z" />
           </svg>
         </div>
-        <h3 class="text-lg sm:text-xl font-bold text-gray-950">
+        <h3 id="empty-state-title" class="text-lg sm:text-xl font-bold text-gray-950">
           {% if query %}
             “{{ query }}” aún no está precargado en este filtro
           {% else %}
             Sin coincidencias exactas en este filtro
           {% endif %}
         </h3>
-        <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed max-w-lg mx-auto">
-          Para garantizarte una respuesta en milisegundos sin congelar tu pantalla, <strong>tecHunter GT</strong> consulta directamente nuestro catálogo precargado en <strong>Neon DB</strong>. Prueba con un término más general (por ejemplo marca o modelo base) o explora una de estas búsquedas instantáneas:
+        <p id="empty-state-desc" class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed max-w-lg mx-auto">
+          Puedes consultar los catálogos en vivo de las tiendas de Guatemala ahora mismo sin recargar la página, o explorar una de nuestras búsquedas semilla instantáneas:
         </p>
-        <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {% for sugerencia_rapida in ['MacBook Air M2', 'iPhone 16', 'Samsung S24', 'Impresora Epson', 'Refrigeradora Mabe', 'Taladro DeWalt', 'Pedigree'] %}
+        <div class="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+          <button
+            type="button"
+            onclick="dispararBusquedaEnVivoDesdeInput()"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+            <span>Buscar en vivo en tiendas (6s)</span>
+          </button>
+          <a
+            href="/"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
+          >
+            <span>Ver todo el catálogo en Neon DB</span>
+          </a>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
+          {% for sugerencia_rapida in ['MacBook Air M2', 'Mousepad Razer Gigantus V2 Large', 'iPhone 16', 'Samsung S24', 'Impresora Epson', 'Refrigeradora Mabe', 'Taladro DeWalt'] %}
           <a
             href="/?q={{ sugerencia_rapida | urlencode }}"
             class="px-3 py-1.5 rounded-full bg-white border border-gray-200 hover:border-emerald-500 text-xs font-medium text-gray-800 hover:text-emerald-700 transition-colors shadow-sm"
           >{{ sugerencia_rapida }}</a>
           {% endfor %}
         </div>
-        <a
-          href="/"
-          class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-950 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold transition-colors shadow-sm"
-        >
-          <span>Ver todo el catálogo en Neon DB</span>
-        </a>
       </div>
-      {% endif %}
 
       <!-- Native Ad 2: Nova Viventia Travel (novaviventiatravel.com) -->
       <section class="mt-14 rounded-3xl border border-gray-200 bg-[#F5F5F7] p-6 sm:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
@@ -597,7 +471,7 @@
             </span>
             <span class="text-xs font-medium text-gray-500">novaviventiatravel.com</span>
           </div>
-          <h3 class="text-lg sm:text-xl font-bold text-gray-950 tracking-tight">
+          <h3 id="nova-viventia-headline" class="text-lg sm:text-xl font-bold text-gray-950 tracking-tight">
             {% if resumen.ahorro_maximo_gtq and resumen.ahorro_maximo_gtq >= 25 %}
               ¡Con los <span class="text-emerald-600 tabular-nums">Q{{ "{:,.2f}".format(resumen.ahorro_maximo_gtq) }}</span> que ahorras en este artículo con tecHunter, planea tu próxima escapada!
             {% else %}
@@ -621,11 +495,11 @@
         </a>
       </section>
 
-      <!-- Roadmap Banner: 24 Tiendas Activas en v5.2 -->
+      <!-- Roadmap Banner: 24 Tiendas Activas en v5.3 -->
       {% if siguientes_tiendas %}
       <div class="mt-6 rounded-2xl border border-gray-200/80 bg-white px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500">
         <div class="flex items-center gap-2">
-          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Especialistas v5.2</span>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Especialistas v5.3</span>
           <span>24 tiendas activas en Neon DB (incorporando Rech, Click Guatemala y Tera · sync 3x/día) · Siguientes en cola:</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -639,7 +513,7 @@
       </div>
       {% endif %}
 
-      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente — v5.2) -->
+      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente — v5.3) -->
       <section id="faq" class="mt-14 pt-10 border-t border-gray-200/80">
         <div class="max-w-4xl mx-auto">
           <div class="text-center mb-8">
@@ -687,7 +561,7 @@
                 4. ¿Cada cuánto se actualizan los precios de las 24 tiendas?
               </h3>
               <p class="mt-2 text-xs sm:text-sm text-gray-600 leading-relaxed">
-                Nuestro worker automatizado en segundo plano ejecuta la sincronización de precios <strong>al menos 3 veces al día (cada 8 horas)</strong> hacia <strong>Neon DB</strong>. Así capturamos ofertas flash y fluctuaciones de stock en Kemik, Intelaf, Rech, Click o Tera manteniendo lecturas en milisegundos.
+                Nuestro worker automatizado en segundo plano ejecuta la sincronización de precios <strong>al menos 3 veces al día (cada 8 horas)</strong> hacia <strong>Neon DB</strong>, y además cuentas con el botón <strong>“Buscar en vivo en tiendas”</strong> para consultar catálogos en paralelo en menos de 6 segundos.
               </p>
             </div>
 
@@ -734,7 +608,7 @@
   <footer class="border-t border-gray-200/80 bg-white py-6 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.2</span>
+        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.3</span>
         <span>·</span>
         <span>Comparador Gratuito de Precios en Guatemala · 24 Tiendas en Neon DB</span>
       </div>
@@ -751,9 +625,56 @@
     </div>
   </footer>
 
-  <!-- Lightweight Web Analytics & UI Controller -->
+  <!-- App Shell Async Hydration, Live Store Scan (Anti-502) & Web Analytics Controller -->
   <script>
     const CURRENT_QUERY = {{ (query or "") | tojson }};
+    const CURRENT_TIENDA = {{ (tienda_activa or "") | tojson }};
+    const CURRENT_CAT = {{ (categoria_activa or "") | tojson }};
+    const CURRENT_GAMA = {{ (gama_activa or "") | tojson }};
+    const CURRENT_ORDEN = {{ (orden_activo or "final") | tojson }};
+    const DEFAULT_LIMIT = {{ paginacion_limit | default(28) }};
+
+    const STORE_DOT_COLORS = {
+      'rech': 'bg-purple-600',
+      'click': 'bg-cyan-600',
+      'tera': 'bg-indigo-600',
+      'istore': 'bg-gray-900',
+      'ishop': 'bg-gray-900',
+      'epa': 'bg-yellow-500',
+      'novex': 'bg-orange-600',
+      'intelaf': 'bg-amber-500',
+      'office-depot': 'bg-red-700',
+      'tienda-tigo': 'bg-blue-600',
+      'tropigas': 'bg-orange-700',
+      'tecno-facil': 'bg-red-500',
+      'la-curacao': 'bg-yellow-600',
+      'tienda-claro': 'bg-rose-600',
+      'pricesmart': 'bg-blue-700',
+      'tiendas-max': 'bg-orange-500',
+      'pacifiko': 'bg-sky-500',
+      'kemik': 'bg-amber-600',
+      'siman': 'bg-rose-500',
+      'cemaco': 'bg-teal-600',
+      'walmart': 'bg-blue-500',
+      'paiz': 'bg-emerald-600',
+      'maxi-despensa': 'bg-lime-600',
+      'elektra': 'bg-yellow-500',
+      'la-torre': 'bg-red-600'
+    };
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatGTQ(val) {
+      const num = Number(val || 0);
+      return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
 
     function techunterTrack(tipo, tienda, titulo, urlDestino, precioGtq) {
       const payload = JSON.stringify({
@@ -815,6 +736,319 @@
         label.textContent = storesExpanded ? 'Mostrar menos' : '+ Todas las tiendas';
       }
     }
+
+    function renderizarTarjetaOferta(oferta, index) {
+      const esMejor = index === 0;
+      const ahorro = Number(oferta.ahorro_gtq || 0);
+      const precio = Number(oferta.precio_gtq || 0);
+      const envio = Number(oferta.costo_envio_gtq || 0);
+      const total = Number(oferta.costo_real_gtq || precio);
+      const dotClass = STORE_DOT_COLORS[oferta.tienda_slug] || 'bg-gray-500';
+      const borderClass = esMejor
+        ? 'border-2 border-emerald-500 ring-4 ring-emerald-500/5'
+        : 'border border-gray-200/90';
+
+      let badgeIzquierdo = '';
+      if (esMejor) {
+        badgeIzquierdo = `
+          <div class="absolute top-3.5 left-3.5 z-10 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-semibold shadow-sm">
+            <span>★</span>
+            <span>Mejor Precio</span>
+          </div>`;
+      } else if (oferta.requiere_membresia) {
+        badgeIzquierdo = `
+          <div class="absolute top-3.5 left-3.5 z-10 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-600 text-white text-[11px] font-semibold shadow-sm">
+            <span>Socio PriceSmart</span>
+          </div>`;
+      }
+
+      const imgHtml = oferta.imagen_url
+        ? `<img src="${escapeHtml(oferta.imagen_url)}" alt="${escapeHtml(oferta.titulo)}" loading="lazy" class="max-h-36 w-auto object-contain mix-blend-multiply transition-transform duration-300 hover:scale-105" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" /><div class="hidden text-xs text-gray-400 font-medium">Sin vista previa</div>`
+        : `<div class="text-xs text-gray-400 font-medium">Sin vista previa</div>`;
+
+      const chips = Array.isArray(oferta.chips_especificaciones) ? oferta.chips_especificaciones : [];
+      const chipsHtml = chips
+        .map((c) => `<span class="px-2.5 py-0.5 rounded-md bg-gray-100 text-gray-600 text-[11px] font-medium">${escapeHtml(c)}</span>`)
+        .join('');
+
+      const ahorroHtml = ahorro > 0
+        ? `<span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full tabular-nums">Ahorras Q${formatGTQ(ahorro)}</span>`
+        : '';
+
+      const envioHtml = envio <= 0
+        ? `<span>Envío gratis · <strong class="font-semibold text-gray-700">Total Q${formatGTQ(total)}</strong></span>`
+        : `<span>Envío Q${formatGTQ(envio)} · <strong class="font-semibold text-gray-700">Total Q${formatGTQ(total)}</strong></span>`;
+
+      const btnClass = esMejor
+        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+        : 'bg-gray-100 hover:bg-gray-950 text-gray-900 hover:text-white';
+
+      return `
+        <article class="apple-card rounded-3xl bg-white flex flex-col justify-between overflow-hidden ${borderClass}">
+          <div>
+            <div class="relative h-52 bg-[#F5F5F7] flex items-center justify-center p-6 border-b border-gray-100">
+              ${badgeIzquierdo}
+              <div class="absolute top-3.5 right-3.5 z-10 px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-gray-200/80 text-[11px] font-medium text-gray-700 shadow-sm">
+                ${escapeHtml(oferta.gama || 'Media · Productividad')}
+              </div>
+              ${imgHtml}
+            </div>
+            <div class="p-5 sm:p-6">
+              <div class="flex items-center justify-between gap-2 text-xs text-gray-500 mb-1.5">
+                <span class="font-medium text-gray-500 truncate">${escapeHtml(oferta.marca || 'Oficial GT')}</span>
+                <span class="inline-flex items-center gap-1.5 font-semibold text-gray-800 shrink-0">
+                  <span class="w-2 h-2 rounded-full ${dotClass}"></span>
+                  <span>${escapeHtml(oferta.tienda)}</span>
+                </span>
+              </div>
+              <h3 class="text-base font-bold text-gray-950 leading-snug line-clamp-2 min-h-[2.75rem]" title="${escapeHtml(oferta.titulo)}">
+                ${escapeHtml(oferta.titulo)}
+              </h3>
+              <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                ${chipsHtml}
+              </div>
+            </div>
+          </div>
+          <div class="px-5 pb-5 sm:px-6 sm:pb-6 pt-2">
+            <div class="pt-3 border-t border-gray-100">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-2xl sm:text-[28px] font-extrabold tracking-tight tabular-nums ${esMejor ? 'text-emerald-600' : 'text-gray-950'}">
+                  Q${formatGTQ(precio)}
+                </span>
+                ${ahorroHtml}
+              </div>
+              <div class="mt-1.5 flex items-center gap-1.5 text-xs text-gray-500 tabular-nums">
+                <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                </svg>
+                ${envioHtml}
+              </div>
+            </div>
+            <a
+              href="${escapeHtml(oferta.url)}"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-tienda="${escapeHtml(oferta.tienda)}"
+              data-titulo="${escapeHtml(oferta.titulo)}"
+              data-precio="${precio}"
+              onclick="techunterTrackOutbound(this)"
+              class="mt-4 w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-full text-xs sm:text-sm font-semibold transition-all ${btnClass}"
+            >
+              <span>Ir a la tienda</span>
+              <span>↗</span>
+            </a>
+          </div>
+        </article>`;
+    }
+
+    function actualizarContadoresYResumen(data, origenTexto) {
+      const ofertas = Array.isArray(data.ofertas) ? data.ofertas : [];
+      const resumen = data.resumen || {};
+      const totalGlobal = Number(resumen.total || ofertas.length || 0);
+      const totalDisponibles = Number(data.total_disponibles || ofertas.length || 0);
+      const ahorroMax = Number(resumen.ahorro_maximo_gtq || 0);
+
+      const headerCount = document.getElementById('header-total-count');
+      if (headerCount) {
+        headerCount.textContent = `${totalGlobal} productos`;
+      }
+
+      const catCounts = resumen.conteo_categorias || {};
+      const mapCats = {
+        'all': totalGlobal,
+        'computo': catCounts.computo || 0,
+        'smartphones': catCounts.smartphones || 0,
+        'hogar': catCounts.hogar || 0,
+        'herramientas': catCounts.herramientas || 0,
+        'super-mascotas': catCounts['super-mascotas'] || 0
+      };
+      Object.keys(mapCats).forEach((k) => {
+        const el = document.querySelector(`[data-cat-count="${k}"]`);
+        if (el) el.textContent = String(mapCats[k]);
+      });
+
+      const storeMap = {
+        'all': totalGlobal,
+        'rech': resumen.total_rech || 0,
+        'click': resumen.total_click || 0,
+        'tera': resumen.total_tera || 0,
+        'intelaf': resumen.total_intelaf || 0,
+        'kemik': resumen.total_kemik || 0,
+        'istore': resumen.total_istore || 0,
+        'epa': resumen.total_epa || 0,
+        'novex': resumen.total_novex || 0,
+        'office-depot': resumen.total_office_depot || 0,
+        'tienda-tigo': resumen.total_tienda_tigo || 0,
+        'tropigas': resumen.total_tropigas || 0,
+        'tecno-facil': resumen.total_tecno_facil || 0,
+        'la-curacao': resumen.total_la_curacao || 0,
+        'tienda-claro': resumen.total_tienda_claro || 0,
+        'pricesmart': resumen.total_pricesmart || 0,
+        'tiendas-max': resumen.total_tiendas_max || 0,
+        'pacifiko': resumen.total_pacifiko || 0,
+        'siman': resumen.total_siman || 0,
+        'cemaco': resumen.total_cemaco || 0,
+        'walmart': resumen.total_walmart || 0,
+        'paiz': resumen.total_paiz || 0,
+        'maxi-despensa': resumen.total_maxi_despensa || 0,
+        'elektra': resumen.total_elektra || 0,
+        'la-torre': resumen.total_la_torre || 0
+      };
+      Object.keys(storeMap).forEach((slug) => {
+        const el = document.querySelector(`[data-store-count="${slug}"]`);
+        if (el) el.textContent = String(storeMap[slug]);
+      });
+
+      const subtitle = document.getElementById('results-subtitle');
+      if (subtitle) {
+        const criterio = CURRENT_ORDEN === 'base' ? 'precio de lista' : 'precio final con envío';
+        let texto = `Mostrando ${ofertas.length} de ${totalDisponibles} ofertas destacadas · ordenadas por ${criterio}`;
+        if (ahorroMax > 0) {
+          texto += ` · <span class="text-emerald-600 font-medium">Ahorro verificado en el mismo producto: Q${formatGTQ(ahorroMax)}</span>`;
+        }
+        if (origenTexto) {
+          texto += ` · <span class="text-emerald-700 font-medium">${escapeHtml(origenTexto)}</span>`;
+        }
+        subtitle.innerHTML = texto;
+      }
+
+      const novaHeadline = document.getElementById('nova-viventia-headline');
+      if (novaHeadline) {
+        if (ahorroMax >= 25) {
+          novaHeadline.innerHTML = `¡Con los <span class="text-emerald-600 tabular-nums">Q${formatGTQ(ahorroMax)}</span> que ahorras en este artículo con tecHunter, planea tu próxima escapada!`;
+        } else {
+          novaHeadline.textContent = 'Compra inteligente en Guatemala e invierte tu ahorro en tu próximo viaje inolvidable.';
+        }
+      }
+    }
+
+    function pintarResultadosEnDOM(data, origenTexto = '') {
+      const skeleton = document.getElementById('skeleton-grid');
+      const grid = document.getElementById('ofertas-grid');
+      const emptyPanel = document.getElementById('empty-state-panel');
+      const ofertas = Array.isArray(data.ofertas) ? data.ofertas : [];
+
+      if (skeleton) skeleton.classList.add('hidden');
+      actualizarContadoresYResumen(data, origenTexto);
+
+      if (ofertas.length > 0) {
+        if (emptyPanel) emptyPanel.classList.add('hidden');
+        if (grid) {
+          grid.innerHTML = ofertas.map((o, idx) => renderizarTarjetaOferta(o, idx)).join('');
+          grid.classList.remove('hidden');
+        }
+        return true;
+      } else {
+        if (grid) {
+          grid.innerHTML = '';
+          grid.classList.add('hidden');
+        }
+        if (emptyPanel) emptyPanel.classList.remove('hidden');
+        return false;
+      }
+    }
+
+    let busquedaEnVivoEnCurso = false;
+
+    async function ejecutarBusquedaEnVivo(termino) {
+      const queryLimpio = String(termino || '').trim();
+      if (!queryLimpio || busquedaEnVivoEnCurso) return;
+      busquedaEnVivoEnCurso = true;
+
+      const animPanel = document.getElementById('live-search-animation');
+      const headline = document.getElementById('live-search-headline');
+      const skeleton = document.getElementById('skeleton-grid');
+      const emptyPanel = document.getElementById('empty-state-panel');
+      const statusBanner = document.getElementById('live-search-status-banner');
+      const statusText = document.getElementById('live-search-status-text');
+      const resultsTitle = document.getElementById('results-title');
+
+      if (resultsTitle) {
+        resultsTitle.textContent = `Resultados para “${queryLimpio}”`;
+      }
+      if (headline) {
+        headline.textContent = `Consultando catálogos en vivo en Guatemala para “${queryLimpio}”...`;
+      }
+      if (emptyPanel) emptyPanel.classList.add('hidden');
+      if (statusBanner) statusBanner.classList.add('hidden');
+      if (animPanel) animPanel.classList.remove('hidden');
+      if (skeleton) skeleton.classList.remove('hidden');
+
+      try {
+        const resp = await fetch('/api/buscar-en-vivo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: queryLimpio,
+            tienda: CURRENT_TIENDA,
+            categoria: CURRENT_CAT,
+            gama: CURRENT_GAMA,
+            orden: CURRENT_ORDEN,
+            limit: DEFAULT_LIMIT
+          })
+        });
+        const data = await resp.json();
+        if (animPanel) animPanel.classList.add('hidden');
+
+        const hayResultados = pintarResultadosEnDOM(data, 'Escaneo en vivo completado');
+        if (hayResultados && statusBanner && statusText) {
+          const tiendasCount = Array.isArray(data.tiendas_con_resultados) ? data.tiendas_con_resultados.length : 1;
+          statusText.innerHTML = `<strong>⚡ Búsqueda en vivo completada (${data.latencia_ms || 0} ms):</strong> Se encontraron ${data.total_disponibles || data.ofertas.length} ofertas verificadas en ${tiendasCount} tienda(s) y se guardaron en Neon DB.`;
+          statusBanner.classList.remove('hidden');
+        }
+      } catch (err) {
+        if (animPanel) animPanel.classList.add('hidden');
+        if (skeleton) skeleton.classList.add('hidden');
+        if (emptyPanel) emptyPanel.classList.remove('hidden');
+      } finally {
+        busquedaEnVivoEnCurso = false;
+      }
+    }
+
+    function dispararBusquedaEnVivoDesdeInput() {
+      const input = document.getElementById('search-input');
+      const termino = (input && input.value ? input.value : CURRENT_QUERY || 'MacBook Air M2').trim();
+      if (input && !input.value) {
+        input.value = termino;
+      }
+      ejecutarBusquedaEnVivo(termino);
+    }
+
+    async function hidratarAppShellDesdeNeon() {
+      const params = new URLSearchParams({
+        q: CURRENT_QUERY,
+        tienda: CURRENT_TIENDA,
+        cat: CURRENT_CAT,
+        gama: CURRENT_GAMA,
+        orden: CURRENT_ORDEN,
+        limit: String(DEFAULT_LIMIT)
+      });
+
+      try {
+        const resp = await fetch(`/api/ofertas?${params.toString()}`);
+        const data = await resp.json();
+        const ofertas = Array.isArray(data.ofertas) ? data.ofertas : [];
+
+        if (ofertas.length === 0 && CURRENT_QUERY.trim().length > 0) {
+          // Si Neon DB devuelve 0 resultados para una búsqueda fuera de la seed list,
+          // activar automáticamente la búsqueda en vivo animada sin recargar ni congelar la página.
+          await ejecutarBusquedaEnVivo(CURRENT_QUERY.trim());
+          return;
+        }
+
+        pintarResultadosEnDOM(data);
+      } catch (err) {
+        const skeleton = document.getElementById('skeleton-grid');
+        const emptyPanel = document.getElementById('empty-state-panel');
+        if (skeleton) skeleton.classList.add('hidden');
+        if (emptyPanel) emptyPanel.classList.remove('hidden');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      hidratarAppShellDesdeNeon();
+    });
   </script>
 </body>
 </html>

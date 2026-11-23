@@ -414,3 +414,108 @@ def test_blindaje_matching_productos_estrictamente_identicos_gigantus_v2_large()
     assert gigantus_click["ahorro_gtq"] == 0.0
 
 
+def test_v5_3_app_shell_skeleton_loading_css_estatico_y_health_ultraligero() -> None:
+    from fastapi.testclient import TestClient
+    from radar_ofertas.interfaces.api.app import (
+        CACHE_NEON_TTL_SEGUNDOS,
+        PAGINACION_DESTACADOS_DEFAULT,
+        TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S,
+        app,
+    )
+
+    # 1. Validar constantes arquitectónicas v5.3
+    assert CACHE_NEON_TTL_SEGUNDOS == 300.0  # 5 minutos de TTL
+    assert 24 <= PAGINACION_DESTACADOS_DEFAULT <= 32
+    assert TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S == 6.0
+
+    client = TestClient(app)
+
+    # 2. Endpoint ultraligero GET /health sin tocar base de datos
+    resp_health = client.get("/health")
+    assert resp_health.status_code == 200
+    datos_health = resp_health.json()
+    assert datos_health["status"] == "ok"
+    assert datos_health["version"] == "5.3.0"
+    assert datos_health["db_touched"] is False
+
+    # 3. Recurso estático minificado /static/styles.css servido directamente
+    resp_css = client.get("/static/styles.css")
+    assert resp_css.status_code == 200
+    assert ".skeleton-shimmer" in resp_css.text
+    assert ".live-progress-bar" in resp_css.text
+    assert ".apple-card" in resp_css.text
+
+    # 4. GET / entrega inmediatamente el App Shell con Skeleton Cards y sin cdn.tailwindcss.com
+    resp_home = client.get("/?q=Mousepad+Razer+Gigantus+V2+Large")
+    assert resp_home.status_code == 200
+    html = resp_home.text
+    assert "cdn.tailwindcss.com" not in html
+    assert '/static/styles.css?v=5.3.0' in html
+    assert 'id="skeleton-grid"' in html
+    assert 'class="skeleton-card' in html
+    assert "Consultando catálogos en vivo en Guatemala..." in html
+    assert "/api/buscar-en-vivo" in html
+    assert "hidratarAppShellDesdeNeon()" in html
+
+
+def test_v5_3_busqueda_en_vivo_acotada_paralela_6s_normaliza_urls_y_aísla_lentos() -> None:
+    from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+    from radar_ofertas.interfaces.api.app import ejecutar_busqueda_en_vivo_acotada
+
+    class _ScraperRapidoClick:
+        async def buscar_producto(self, termino: str) -> list[OfertaLocal]:
+            await asyncio.sleep(0.02)
+            return [
+                OfertaLocal(
+                    titulo="Mousepad Gamer Razer Gigantus V2 Large 450x400mm",
+                    precio_gtq=Decimal("175.00"),
+                    # URL sintética /producto/ que debe ser convertida por resolver_url_saliente_segura
+                    url="https://www.click.gt/producto/mousepad-razer-gigantus-v2-large",
+                    imagen_url="https://www.click.gt/img/gigantus.jpg",
+                    tienda="Click Guatemala",
+                )
+            ]
+
+    class _ScraperRapidoRech:
+        async def buscar_producto(self, termino: str) -> list[OfertaLocal]:
+            await asyncio.sleep(0.03)
+            return [
+                OfertaLocal(
+                    titulo="Mousepad Gamer Razer Gigantus V2 Large Micro-Weave",
+                    precio_gtq=Decimal("165.00"),
+                    url="https://www.rech.com.gt/producto/razer-gigantus-v2-large",
+                    imagen_url="https://www.rech.com.gt/img/gigantus.jpg",
+                    tienda="Rech",
+                )
+            ]
+
+    class _ScraperLentoColgado:
+        async def buscar_producto(self, termino: str) -> list[OfertaLocal]:
+            # Simula una tienda externa que tarda 15 segundos y debe ser cortada por el timeout global
+            await asyncio.sleep(15.0)
+            return []
+
+    resultado = asyncio.run(
+        ejecutar_busqueda_en_vivo_acotada(
+            termino="Mousepad Razer Gigantus V2 Large",
+            scrapers=[
+                ("Click Guatemala", _ScraperRapidoClick()),
+                ("Rech", _ScraperRapidoRech()),
+                ("Tienda Lenta", _ScraperLentoColgado()),
+            ],
+            timeout_global_s=0.35,
+            persistir_en_db=False,
+        )
+    )
+
+    assert len(resultado["ofertas_locales"]) == 2
+    assert resultado["latencia_ms"] < 900.0
+    assert set(resultado["tiendas_con_resultados"]) == {"Click Guatemala", "Rech"}
+    urls = {o.tienda: o.url for o in resultado["ofertas_locales"]}
+    assert urls["Click Guatemala"].startswith("https://www.click.gt/buscar?q=")
+    assert urls["Rech"].startswith("https://www.rech.com.gt/?s=")
+    assert "/producto/" not in urls["Click Guatemala"]
+    assert "/producto/" not in urls["Rech"]
+
+
+
