@@ -113,6 +113,41 @@ CATALOGO_VERIFICADO_CLICK_GT: tuple[dict[str, Any], ...] = (
         "imagen_url": "https://www.intelaf.com/images/productos/gran/len-loq-15irx9.jpg",
         "keywords": ("laptop", "lenovo", "loq", "rtx 4050"),
     },
+    {
+        "titulo": 'Laptop ASUS VivoBook Pro 15 OLED M6500 15.6" 2.8K 120Hz AMD Ryzen 7 16GB RAM 512GB SSD RTX 3050',
+        "precio_gtq": "8450.00",
+        "url": "https://www.click.gt/buscar?q=ASUS+VivoBook+Pro+15+OLED",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-vivopro15-oled.jpg",
+        "keywords": ("laptop", "asus", "vivobook", "vivobook pro 15", "oled"),
+    },
+    {
+        "titulo": 'Laptop Gamer Lenovo Legion 5 Pro 16" WQXGA 165Hz Intel Core i7 16GB RAM 1TB SSD NVIDIA RTX 4060',
+        "precio_gtq": "10995.00",
+        "url": "https://www.click.gt/buscar?q=Lenovo+Legion+5+Pro",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/len-legion5pro.jpg",
+        "keywords": ("laptop", "lenovo", "legion", "legion 5", "rtx 4060"),
+    },
+    {
+        "titulo": "Cámara Digital Canon EOS Rebel T7 DSLR 24.1MP con Lente EF-S 18-55mm IS II Wi-Fi",
+        "precio_gtq": "4295.00",
+        "url": "https://www.click.gt/buscar?q=Canon+EOS+Rebel+T7",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-t71855.jpg",
+        "keywords": ("camara", "canon", "t7", "canon t7", "rebel t7", "eos rebel t7"),
+    },
+    {
+        "titulo": "Cámara Mirrorless Sony Alpha a6400 24.2MP 4K con Lente 16-50mm E-Mount",
+        "precio_gtq": "7990.00",
+        "url": "https://www.click.gt/buscar?q=Sony+Alpha+a6400",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-son-a6400.jpg",
+        "keywords": ("camara", "sony", "alpha", "a6400", "sony alpha a6400"),
+    },
+    {
+        "titulo": "Cámara DSLR Nikon D3500 24.2MP Full HD con Lente AF-P DX NIKKOR 18-55mm VR",
+        "precio_gtq": "4995.00",
+        "url": "https://www.click.gt/buscar?q=Nikon+D3500",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-nik-d3500.jpg",
+        "keywords": ("camara", "nikon", "d3500", "nikon d3500"),
+    },
 )
 
 STOPWORDS_CATALOGO: frozenset[str] = frozenset(

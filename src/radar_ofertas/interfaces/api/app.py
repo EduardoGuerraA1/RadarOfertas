@@ -64,9 +64,14 @@ from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
 from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
+from radar_ofertas.infrastructure.scrapers.guatemaladigital_scraper import (
+    GuatemalaDigitalScraper,
+)
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
 from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
+from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
+from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
 from radar_ofertas.infrastructure.scrapers.officedepot_scraper import OfficeDepotScraper
 from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
@@ -116,7 +121,7 @@ async def lifespan(app_instance: FastAPI):
             )
         )
         logger.info(
-            "Worker en segundo plano de tecHunter GT v5.3 programado exitosamente (cada %s min / >=3x al día).",
+            "Worker en segundo plano de tecHunter GT v5.4 programado exitosamente (cada %s min / >=3x al día).",
             intervalo_configurado,
         )
     try:
@@ -127,12 +132,12 @@ async def lifespan(app_instance: FastAPI):
 
 
 app = FastAPI(
-    title="tecHunter GT v5.3 — Comparador Instantáneo en Guatemala",
+    title="tecHunter GT v5.4 — Comparador Instantáneo en Guatemala",
     description=(
-        "Plataforma de comparación de precios con Arquitectura App Shell (<100 ms), "
-        "Skeleton Loading, caché TTL 5 min con refresco en segundo plano y búsqueda en vivo anti-502."
+        "Plataforma de comparación de precios con 25 tiendas activas (incluyendo Guatemala Digital), "
+        "Arquitectura App Shell (<100 ms), caché TTL 5 min y búsqueda en vivo anti-502 (timeout 9s)."
     ),
-    version="5.3.0",
+    version="5.4.0",
     lifespan=lifespan,
 )
 
@@ -180,7 +185,11 @@ TERMINOS_ZTECH_COMPUTO: tuple[str, ...] = (
     "g29",
     "logitech",
     "asus",
+    "vivobook",
+    "zenbook",
+    "oled",
     "lenovo",
+    "legion",
     "thinkpad",
     "hp",
     "dell",
@@ -188,6 +197,11 @@ TERMINOS_ZTECH_COMPUTO: tuple[str, ...] = (
     "msi",
     "acer",
     "razer",
+    "canon",
+    "nikon",
+    "sony",
+    "alpha",
+    "rebel",
     "servidor",
     "nas",
 )
@@ -228,7 +242,7 @@ STOPWORDS_COMPARACION: frozenset[str] = frozenset(
     }
 )
 
-# Scrapers de las olas v5.1 y v5.2 100% activos en producción
+# Scrapers de las olas v5.1, v5.2 y v5.4 100% activos en producción
 SCRAPERS_NUEVOS_ACTIVOS_V5_1: dict[str, Any] = {
     "tienda-tigo": TigoScraper(habilitado=True),
     "office-depot": OfficeDepotScraper(habilitado=True),
@@ -241,9 +255,13 @@ SCRAPERS_NUEVOS_ACTIVOS_V5_2: dict[str, Any] = {
     "tera": TeraScraper(habilitado=True),
 }
 
-# Configuración de paginación y timeouts v5.3
+SCRAPERS_NUEVOS_ACTIVOS_V5_4: dict[str, Any] = {
+    "guatemaladigital": GuatemalaDigitalScraper(habilitado=True),
+}
+
+# Configuración de paginación y timeouts v5.4 (9 segundos asíncronos controlados)
 PAGINACION_DESTACADOS_DEFAULT: int = 28
-TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S: float = 6.0
+TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S: float = 9.0
 
 
 class EscanearRequest(BaseModel):
@@ -440,6 +458,7 @@ def _calcular_resumen(
     if not ofertas:
         return {
             "total": 0,
+            "total_guatemaladigital": 0,
             "total_istore": 0,
             "total_epa": 0,
             "total_novex": 0,
@@ -479,6 +498,9 @@ def _calcular_resumen(
 
     return {
         "total": len(ofertas),
+        "total_guatemaladigital": sum(
+            1 for o in ofertas if o["tienda_slug"] == "guatemaladigital"
+        ),
         "total_istore": total_istore,
         "total_epa": sum(1 for o in ofertas if o["tienda_slug"] == "epa"),
         "total_novex": sum(1 for o in ofertas if o["tienda_slug"] == "novex"),
@@ -529,7 +551,7 @@ def _calcular_resumen(
     }
 
 
-# Caché en memoria v5.3: TTL ampliado a 5 minutos (300s) con refresco en segundo plano
+# Caché en memoria v5.4: TTL de 5 minutos (300s) con refresco en segundo plano
 # para absorber por completo cualquier cold start de Neon DB.
 _CACHE_LECTURA_NEON: dict[tuple[str, str, str], tuple[float, list[dict[str, Any]]]] = {}
 CACHE_NEON_TTL_SEGUNDOS: float = 300.0
@@ -537,6 +559,9 @@ CACHE_NEON_REFRESH_BG_SEGUNDOS: float = 150.0
 _TAREAS_REFRESCO_CACHE_EN_CURSO: set[tuple[str, str, str]] = set()
 
 _CATALOGOS_MEMORIA_INSTANTANEA: tuple[Any, ...] = (
+    GuatemalaDigitalScraper(simular=True),
+    KemikScraper(usar_playwright=False, simular=True),
+    PacifikoScraper(simular=True),
     RechScraper(simular=True),
     ClickScraper(simular=True),
     TeraScraper(simular=True),
@@ -776,14 +801,32 @@ async def _consultar_ofertas_con_resiliencia(
     return ofertas_respaldo, bool(ofertas_respaldo), error_db
 
 
-def _construir_scrapers_busqueda_en_vivo(timeout_individual_s: int = 5) -> list[tuple[str, Any]]:
+def _construir_scrapers_busqueda_en_vivo(timeout_individual_s: int = 8) -> list[tuple[str, Any]]:
     """
-    Construye la batería de scrapers activos en Guatemala para consultas en vivo paralelas.
+    Construye la batería priorizada de scrapers activos en Guatemala para consultas en vivo paralelas.
+    Prioriza los endpoints de búsqueda más rápidos y tolerantes (Guatemala Digital, Kemik HTTP,
+    Pacifiko, Tiendas Max GraphQL/HTTP, Cemaco, Intelaf, Click Guatemala, Rech y Tera).
     """
     return [
-        ("Rech", RechScraper(timeout_s=timeout_individual_s)),
-        ("Click Guatemala", ClickScraper(timeout_s=timeout_individual_s)),
-        ("Tera", TeraScraper(timeout_s=timeout_individual_s)),
+        ("Guatemala Digital", GuatemalaDigitalScraper(timeout_s=timeout_individual_s)),
+        (
+            "Kemik",
+            KemikScraper(
+                headless=True,
+                usar_playwright=False,
+                timeout_s=timeout_individual_s,
+            ),
+        ),
+        ("Pacifiko", PacifikoScraper(timeout_s=timeout_individual_s)),
+        (
+            "Tiendas Max",
+            MaxScraper(
+                headless=True,
+                timeout_s=timeout_individual_s,
+                usar_playwright_fallback=False,
+            ),
+        ),
+        ("Cemaco", CemacoScraper(timeout_s=timeout_individual_s)),
         (
             "Intelaf",
             IntelafScraper(
@@ -792,10 +835,13 @@ def _construir_scrapers_busqueda_en_vivo(timeout_individual_s: int = 5) -> list[
                 usar_playwright_fallback=False,
             ),
         ),
+        ("Click Guatemala", ClickScraper(timeout_s=timeout_individual_s)),
+        ("Rech", RechScraper(timeout_s=timeout_individual_s)),
+        ("Tera", TeraScraper(timeout_s=timeout_individual_s)),
+        ("Office Depot", OfficeDepotScraper(timeout_s=timeout_individual_s)),
         ("iStore", IStoreScraper(timeout_s=timeout_individual_s)),
         ("EPA", EpaScraper(timeout_s=timeout_individual_s)),
         ("Novex", NovexScraper(timeout_s=timeout_individual_s)),
-        ("Office Depot", OfficeDepotScraper(timeout_s=timeout_individual_s)),
         (
             "Tecno Fácil",
             TecnoFacilScraper(
@@ -811,14 +857,12 @@ def _construir_scrapers_busqueda_en_vivo(timeout_individual_s: int = 5) -> list[
         ("PriceSmart", PriceSmartScraper(timeout_s=timeout_individual_s)),
         ("Oficiales", TiendasOficialesScraper(timeout_s=timeout_individual_s)),
         ("Walmart Grupo", WalmartScraper(timeout_s=timeout_individual_s)),
-        ("Cemaco", CemacoScraper(timeout_s=timeout_individual_s)),
-        ("Pacifiko", PacifikoScraper()),
         ("La Torre", SuperScraper()),
     ]
 
 
 async def _ejecutar_scraper_seguro(
-    scraper: Any, nombre_tienda: str, termino: str, timeout_s: float = 5.5
+    scraper: Any, nombre_tienda: str, termino: str, timeout_s: float = 8.5
 ) -> tuple[list[OfertaLocal], str | None]:
     try:
         ofertas = await asyncio.wait_for(
@@ -841,14 +885,17 @@ async def ejecutar_busqueda_en_vivo_acotada(
     timeout_global_s: float = TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S,
     persistir_en_db: bool = True,
     categoria_db: str = "",
+    repositorio: PostgresOfertaRepository | None = None,
 ) -> dict[str, Any]:
     """
-    Consulta en paralelo (`asyncio.gather` / `asyncio.wait`) los scrapers activos de Guatemala
-    con un timeout global estricto de 6 segundos (`timeout_global_s=6.0`).
+    Consulta en paralelo (`asyncio.wait` / `asyncio.gather`) los scrapers activos de Guatemala
+    con un timeout global controlado de 9 segundos (`timeout_global_s=9.0`).
     Todo lo que responda dentro de ese límite:
       1. Es filtrado con `es_oferta_relevante`.
       2. Pasa por `resolver_url_saliente_segura` para garantizar cero enlaces 404/500.
-      3. Se guarda automáticamente en Neon DB para que futuras consultas sean instantáneas.
+      3. Se guarda automáticamente en Neon DB e invalida `_CACHE_LECTURA_NEON` para aparecer al instante.
+      4. Si devuelve 0 resultados por bloqueos externos, guarda el término en la tabla
+         `busquedas_pendientes` en Neon DB para que `worker_precarga.py` lo procese en su próxima corrida.
     """
     inicio = time.monotonic()
     termino_limpio = (termino or "").strip()
@@ -857,6 +904,7 @@ async def ejecutar_busqueda_en_vivo_acotada(
             "ofertas_locales": [],
             "tiendas_con_resultados": [],
             "nuevas_guardadas_neon": 0,
+            "registrada_en_busquedas_pendientes": False,
             "latencia_ms": 0.0,
         }
 
@@ -930,19 +978,32 @@ async def ejecutar_busqueda_en_vivo_acotada(
         )
 
     nuevas_guardadas = 0
-    if persistir_en_db and ofertas_seguras and (os.environ.get("DATABASE_URL") or "").strip():
-        cat_destino = categoria_db or _detectar_categoria_por_query(termino_limpio)
+    registrada_pendiente = False
+    cat_destino = categoria_db or _detectar_categoria_por_query(termino_limpio)
+    tiene_db = repositorio is not None or bool((os.environ.get("DATABASE_URL") or "").strip())
+
+    if persistir_en_db and tiene_db:
         try:
-            repo = PostgresOfertaRepository()
-            nuevas_guardadas = await asyncio.wait_for(
-                asyncio.to_thread(
-                    repo.guardar_ofertas,
-                    ofertas_seguras,
-                    cat_destino,
-                ),
-                timeout=3.5,
-            )
-            _CACHE_LECTURA_NEON.clear()
+            repo = repositorio or PostgresOfertaRepository()
+            if ofertas_seguras:
+                nuevas_guardadas = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        repo.guardar_ofertas,
+                        ofertas_seguras,
+                        cat_destino,
+                    ),
+                    timeout=3.5,
+                )
+                _CACHE_LECTURA_NEON.clear()
+            else:
+                registrada_pendiente = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        repo.registrar_busqueda_pendiente,
+                        termino_limpio,
+                        cat_destino,
+                    ),
+                    timeout=3.5,
+                )
         except Exception as exc:
             logger.warning(
                 "Persistencia en Neon DB tras búsqueda en vivo omitida (%s): %s",
@@ -955,6 +1016,7 @@ async def ejecutar_busqueda_en_vivo_acotada(
         "ofertas_locales": ofertas_seguras,
         "tiendas_con_resultados": sorted(tiendas_con_resultados),
         "nuevas_guardadas_neon": nuevas_guardadas,
+        "registrada_en_busquedas_pendientes": registrada_pendiente,
         "latencia_ms": latencia_ms,
     }
 
@@ -968,7 +1030,7 @@ async def health_check() -> dict[str, Any]:
     return {
         "status": "ok",
         "service": "tecHunter GT",
-        "version": "5.3.0",
+        "version": "5.4.0",
         "db_touched": False,
     }
 
@@ -1024,14 +1086,14 @@ async def api_seed_status(
     admin: str = Query(default=""),
 ) -> dict[str, Any]:
     """
-    Expone el estado del Worker de Precarga Inteligente (3x/día) y el cruce de las 24 tiendas activas.
+    Expone el estado del Worker de Precarga Inteligente (3x/día) y el cruce de las 25 tiendas activas.
     Las métricas de analítica solo se incluyen si la petición está autenticada como admin.
     """
     cruce = cruzar_matriz_tiendas_y_prioridades()
     todos_seed = obtener_todos_los_productos_semilla()
     es_admin = _verificar_acceso_admin(request, admin_param=admin)
     respuesta: dict[str, Any] = {
-        "version": "5.3.0",
+        "version": "5.4.0",
         "cache_neon_ttl_segundos": CACHE_NEON_TTL_SEGUNDOS,
         "total_productos_semilla": len(todos_seed),
         "categorias_semilla": {
@@ -1039,6 +1101,7 @@ async def api_seed_status(
         },
         "scrapers_recien_activados_v5_1": list(SCRAPERS_NUEVOS_ACTIVOS_V5_1.keys()),
         "scrapers_recien_activados_v5_2": list(SCRAPERS_NUEVOS_ACTIVOS_V5_2.keys()),
+        "scrapers_recien_activados_v5_4": list(SCRAPERS_NUEVOS_ACTIVOS_V5_4.keys()),
         "worker_precarga": ESTADO_WORKER_PRECARGA,
         "matriz_tiendas": cruce,
     }
@@ -1053,7 +1116,7 @@ async def vista_comparador(
     q: str = Query(default="", description="Término de búsqueda en Neon DB"),
     tienda: str = Query(
         default="",
-        description="Filtro por tienda: rech, click, tera, istore, epa, novex, intelaf, office-depot, tecno-facil, la-curacao, tropigas, tienda-claro, tienda-tigo, pricesmart, siman, elektra, walmart, paiz, maxi-despensa, cemaco, pacifiko, la-torre, tiendas-max o kemik",
+        description="Filtro por tienda: guatemaladigital, rech, click, tera, istore, epa, novex, intelaf, office-depot, tecno-facil, la-curacao, tropigas, tienda-claro, tienda-tigo, pricesmart, siman, elektra, walmart, paiz, maxi-despensa, cemaco, pacifiko, la-torre, tiendas-max o kemik",
     ),
     cat: str = Query(
         default="",
@@ -1073,7 +1136,7 @@ async def vista_comparador(
     ),
 ) -> HTMLResponse:
     """
-    Arquitectura App Shell + Skeleton Loading (v5.3):
+    Arquitectura App Shell + Skeleton Loading (v5.4):
     Desacopla la entrega del HTML inicial de la consulta SQL para responder en < 100 ms.
     Devuelve inmediatamente `index.html` con tarjetas esqueleto (Skeleton Screens), y el
     frontend invoca asíncronamente `GET /api/ofertas` (paginado a 28 productos destacados)
@@ -1102,8 +1165,6 @@ async def vista_comparador(
         else _verificar_acceso_admin(request, admin_param=admin)
     )
 
-    # Lectura no bloqueante de resumen si la caché ya está caliente en RAM (< 0.2 ms);
-    # de lo contrario entrega resumen inicial en 0 y el frontend hidrata vía fetch('/api/ofertas').
     clave_cache = (q.strip().lower(), tienda_limpia, "")
     entrada_caliente = _CACHE_LECTURA_NEON.get(clave_cache)
     if (
@@ -1238,7 +1299,7 @@ async def api_listar_ofertas(
         ofertas_paginadas = ofertas_visibles[offset : offset + limit]
 
         return {
-            "version": "5.3.0",
+            "version": "5.4.0",
             "query": q,
             "tienda": tienda,
             "categoria_ui": cat_limpia,
@@ -1261,10 +1322,11 @@ async def api_listar_ofertas(
 @app.post("/api/buscar-en-vivo")
 async def api_buscar_en_vivo(payload: BuscarEnVivoRequest) -> JSONResponse:
     """
-    Búsqueda en Vivo Fuera de la DB con Timeout Global Estricto de 6 Segundos (Anti-502).
-    Consulta en paralelo los scrapers activos de Guatemala, pasa cada resultado por
-    `resolver_url_saliente_segura`, guarda automáticamente en Neon DB y devuelve JSON
-    para renderizarse dinámicamente en el frontend con animación fluida.
+    Búsqueda en Vivo Fuera de la DB con Timeout Asíncrono Controlado de 9 Segundos (Anti-502).
+    Prioriza los scrapers más rápidos y tolerantes (Guatemala Digital, Kemik, Pacifiko, Max,
+    Cemaco, Intelaf, Click, Rech, Tera), pasa cada resultado por `resolver_url_saliente_segura`,
+    guarda automáticamente en Neon DB e invalida la caché de lectura.
+    Si devuelve 0 resultados por bloqueos externos, registra el término en `busquedas_pendientes`.
     """
     termino = (payload.query or "").strip()
     if not termino:
@@ -1340,8 +1402,8 @@ async def api_buscar_en_vivo(payload: BuscarEnVivoRequest) -> JSONResponse:
         status_code=200,
         content={
             "status": "ok",
-            "version": "5.3.0",
-            "modo": "live_parallel_6s",
+            "version": "5.4.0",
+            "modo": "live_parallel_9s",
             "timeout_global_s": TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S,
             "query": termino,
             "tienda": tienda_limpia,
@@ -1350,6 +1412,9 @@ async def api_buscar_en_vivo(payload: BuscarEnVivoRequest) -> JSONResponse:
             "orden": orden_limpio,
             "latencia_ms": resultado_vivo["latencia_ms"],
             "nuevas_guardadas_neon": resultado_vivo["nuevas_guardadas_neon"],
+            "registrada_en_busquedas_pendientes": resultado_vivo[
+                "registrada_en_busquedas_pendientes"
+            ],
             "tiendas_con_resultados": resultado_vivo["tiendas_con_resultados"],
             "total_disponibles": len(ofertas_visibles),
             "destacar_ztech": _es_busqueda_computo_ztech(termino, cat_limpia),
@@ -1382,13 +1447,13 @@ async def api_escanear_en_vivo(payload: EscanearRequest) -> JSONResponse:
         status_code=200,
         content={
             "status": "success",
-            "modo": "background_worker_v5_3",
+            "modo": "background_worker_v5_4",
             "nuevas_ofertas": 0,
             "query": termino,
             "categoria": categoria,
             "detail": (
                 "Tarea encolada en el Worker en Segundo Plano; "
-                "usa POST /api/buscar-en-vivo para consulta interactiva en 6 segundos."
+                "usa POST /api/buscar-en-vivo para consulta interactiva en 9 segundos."
             ),
         },
     )

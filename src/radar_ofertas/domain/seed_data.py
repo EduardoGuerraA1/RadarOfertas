@@ -76,6 +76,15 @@ seed_list_guatemala: dict[str, list[str]] = {
         "Webcam Logitech Brio 4K Ultra HD",
         "Webcam Logitech C270 HD",
         "Webcam Razer Kiyo X Full HD",
+        # Fotografía Profesional y Cámaras Mirrorless / DSLR (v5.4)
+        "Canon EOS Rebel T7",
+        "Canon R100",
+        "Sony Alpha a6400",
+        "Nikon D3500",
+        # Laptops Pro / OLED y Gaming de Alto Rendimiento (v5.4)
+        "ASUS VivoBook Pro 15 OLED",
+        "ASUS Zenbook OLED",
+        "Lenovo Legion",
     ],
     "smartphones": [
         # Apple iPhone
@@ -308,22 +317,22 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
         {
             "nombre": "Macrosistemas",
             "url": "https://www.macrosistemas.com",
-            "verticales": ["computo", "gaming", "oficina"],
+            "verticales": ["computo", "gaming", "oficina", "laptops_pro", "fotografia"],
         },
         {
             "nombre": "Click Guatemala",
             "url": "https://www.click.gt",
-            "verticales": ["computo", "smartphones", "gaming"],
+            "verticales": ["computo", "smartphones", "gaming", "fotografia"],
         },
         {
             "nombre": "iShop Guatemala",
             "url": "https://ishop.gt",
-            "verticales": ["apple", "smartphones", "computo"],
+            "verticales": ["apple", "smartphones", "computo", "fotografia", "accesorios_pro"],
         },
         {
             "nombre": "iCon Guatemala",
             "url": "https://icongt.com",
-            "verticales": ["apple", "smartphones", "computo"],
+            "verticales": ["apple", "smartphones", "computo", "fotografia", "audio_pro"],
         },
         {
             "nombre": "TechStore Guatemala",
@@ -343,12 +352,19 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
         {
             "nombre": "Spirit Computación",
             "url": "https://www.spiritcomputacion.com",
-            "verticales": ["computo", "oficina"],
+            "verticales": ["computo", "oficina", "laptops_pro", "impresion"],
         },
         {
             "nombre": "Guatemaladigital",
             "url": "https://guatemaladigital.com",
-            "verticales": ["computo", "smartphones", "herramientas", "importacion"],
+            "verticales": [
+                "computo",
+                "smartphones",
+                "fotografia",
+                "laptops_oled",
+                "herramientas",
+                "importacion",
+            ],
         },
     ],
     "3_telefonia_y_tiendas_oficiales": [
@@ -460,8 +476,9 @@ tiendas_ecommerce_guatemala: dict[str, list[dict[str, Any]]] = {
     ],
 }
 
-# Las 24 tiendas actualmente operativas en tecHunter GT v5.2 (con su slug en Neon DB)
+# Las 25 tiendas actualmente operativas en tecHunter GT v5.4 (con su slug en Neon DB)
 TIENDAS_OPERATIVAS_TECHUNTER: tuple[dict[str, str], ...] = (
+    {"slug": "guatemaladigital", "nombre": "Guatemala Digital", "alias_matriz": "Guatemaladigital", "url": "https://guatemaladigital.com"},
     {"slug": "tiendas-max", "nombre": "Tiendas Max", "alias_matriz": "Max Distelsa", "url": "https://www.max.com.gt"},
     {"slug": "tecno-facil", "nombre": "Tecno Fácil", "alias_matriz": "Tecno Fácil (Grupo Distelsa)", "url": "https://www.tecnofacil.com.gt"},
     {"slug": "kemik", "nombre": "Kemik", "alias_matriz": "Kemik", "url": "https://www.kemik.gt"},
@@ -513,15 +530,16 @@ def obtener_todos_los_productos_semilla() -> list[tuple[str, str, str]]:
 
 def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     """
-    Cruza automáticamente `tiendas_ecommerce_guatemala` con las 24 tiendas operativas
-    de tecHunter GT v5.2 (incluyendo los especialistas en cómputo Rech Guatemala,
-    Click Guatemala y Tera Guatemala) e identifica las siguientes tiendas en el backlog.
+    Cruza automáticamente `tiendas_ecommerce_guatemala` con las 25 tiendas operativas
+    de tecHunter GT v5.4 (incluyendo Guatemala Digital, Rech Guatemala, Click Guatemala
+    y Tera Guatemala) e identifica las siguientes tiendas en el backlog.
     """
     nombres_operativos_norm = {
         t["alias_matriz"].strip().lower() for t in TIENDAS_OPERATIVAS_TECHUNTER
     } | {t["nombre"].strip().lower() for t in TIENDAS_OPERATIVAS_TECHUNTER}
 
     dominios_operativos = (
+        "guatemaladigital.com",
         "max.com.gt",
         "tecnofacil.com.gt",
         "kemik.gt",
@@ -552,6 +570,7 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
 
     tiendas_activas_en_matriz: list[dict[str, Any]] = []
     tiendas_pendientes: list[dict[str, Any]] = []
+    tiendas_fotografia_y_tecnologia: list[dict[str, Any]] = []
 
     pesos_prioridad_estrategica: dict[str, tuple[int, str]] = {
         "El Gallo Más Gallo": (
@@ -587,6 +606,15 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
                 "estado": "operativa" if es_operativa else "pendiente",
             }
 
+            if "fotografia" in verticales or nombre in {
+                "iShop Guatemala",
+                "iCon Guatemala",
+                "Macrosistemas",
+                "Spirit Computación",
+                "Guatemaladigital",
+            }:
+                tiendas_fotografia_y_tecnologia.append(registro)
+
             if es_operativa:
                 tiendas_activas_en_matriz.append(registro)
             else:
@@ -606,7 +634,7 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
     siguientes_3_alta_prioridad = tiendas_pendientes[:3]
 
     return {
-        "total_operativas_sistema": 24,
+        "total_operativas_sistema": 25,
         "tiendas_recien_activadas_v5_1": [
             "Tienda Tigo Guatemala",
             "Office Depot Guatemala",
@@ -617,6 +645,10 @@ def cruzar_matriz_tiendas_y_prioridades() -> dict[str, Any]:
             "Click Guatemala",
             "Tera Guatemala",
         ],
+        "tiendas_recien_activadas_v5_4": [
+            "Guatemaladigital",
+        ],
+        "tiendas_especializadas_fotografia_y_tecnologia": tiendas_fotografia_y_tecnologia,
         "total_catalogo_matriz": len(tiendas_activas_en_matriz) + len(tiendas_pendientes),
         "operativas_cruzadas": tiendas_activas_en_matriz,
         "pendientes_ordenadas": tiendas_pendientes,

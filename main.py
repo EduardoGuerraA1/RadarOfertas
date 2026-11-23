@@ -47,6 +47,9 @@ from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
 from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
+from radar_ofertas.infrastructure.scrapers.guatemaladigital_scraper import (
+    GuatemalaDigitalScraper,
+)
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
 from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
 from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
@@ -314,8 +317,10 @@ async def ejecutar_orquestador() -> None:
     rech_scraper = RechScraper(simular=args.simular)
     click_scraper = ClickScraper(simular=args.simular)
     tera_scraper = TeraScraper(simular=args.simular)
+    guatemaladigital_scraper = GuatemalaDigitalScraper(simular=args.simular)
 
     scrapers_en_vivo = [
+        guatemaladigital_scraper.buscar_producto(termino),
         pacifiko_scraper.buscar_producto(termino),
         super_scraper.buscar_producto(termino),
         tecnofacil_scraper.buscar_producto(termino),

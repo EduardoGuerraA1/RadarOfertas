@@ -32,8 +32,12 @@ from radar_ofertas.infrastructure.scrapers.cemaco_scraper import CemacoScraper
 from radar_ofertas.infrastructure.scrapers.claro_scraper import ClaroScraper
 from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
 from radar_ofertas.infrastructure.scrapers.epa_scraper import EpaScraper
+from radar_ofertas.infrastructure.scrapers.guatemaladigital_scraper import (
+    GuatemalaDigitalScraper,
+)
 from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
 from radar_ofertas.infrastructure.scrapers.istore_scraper import IStoreScraper
+from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
 from radar_ofertas.infrastructure.scrapers.lacuracao_scraper import LaCuracaoScraper
 from radar_ofertas.infrastructure.scrapers.max_scraper import MaxScraper
 from radar_ofertas.infrastructure.scrapers.novex_scraper import NovexScraper
@@ -53,7 +57,7 @@ from radar_ofertas.infrastructure.scrapers.walmart_scraper import WalmartScraper
 
 logger = logging.getLogger("tecHunter.worker_precarga")
 
-# Frecuencia oficial v5.2: mínimo 3 sincronizaciones diarias (cada 8 horas = 480 minutos)
+# Frecuencia oficial v5.4: mínimo 3 sincronizaciones diarias (cada 8 horas = 480 minutos)
 CICLOS_DIARIOS_MINIMOS: int = 3
 INTERVALO_HORAS_DEFAULT: int = 8
 INTERVALO_MINUTOS_DEFAULT: int = INTERVALO_HORAS_DEFAULT * 60  # 480 minutos
@@ -76,6 +80,7 @@ ESTADO_WORKER_PRECARGA: dict[str, Any] = {
     "productos_procesados_ciclo": 0,
     "ofertas_evaluadas_ciclo": 0,
     "nuevos_precios_insertados_ciclo": 0,
+    "busquedas_pendientes_procesadas_ciclo": 0,
     "ciclos_completados": 0,
 }
 
@@ -136,14 +141,30 @@ async def precargar_termino_semilla(
     timeout_scraper_s: float = 10.0,
 ) -> dict[str, Any]:
     """
-    Ejecuta en paralelo los scrapers ligeros de las 24 tiendas activas (incluyendo Intelaf, Rech,
-    Click Guatemala y Tera) para un término de `seed_list_guatemala`, filtra con el Motor de
-    Precisión y guarda únicamente cambios reales de precio en Neon DB.
+    Ejecuta en paralelo los scrapers ligeros de las 25 tiendas activas (incluyendo Guatemala Digital,
+    Kemik, Pacifiko, Intelaf, Rech, Click Guatemala y Tera) para un término de `seed_list_guatemala`,
+    filtra con el Motor de Precisión y guarda únicamente cambios reales de precio en Neon DB.
     """
     scrapers: list[tuple[str, Any]] = [
-        ("iStore", IStoreScraper(timeout_s=int(timeout_scraper_s))),
-        ("EPA", EpaScraper(timeout_s=int(timeout_scraper_s))),
-        ("Novex", NovexScraper(timeout_s=int(timeout_scraper_s))),
+        ("Guatemala Digital", GuatemalaDigitalScraper(timeout_s=int(timeout_scraper_s))),
+        (
+            "Kemik",
+            KemikScraper(
+                headless=True,
+                usar_playwright=False,
+                timeout_s=int(timeout_scraper_s),
+            ),
+        ),
+        ("Pacifiko", PacifikoScraper(timeout_s=int(timeout_scraper_s))),
+        (
+            "Tiendas Max",
+            MaxScraper(
+                headless=True,
+                timeout_s=int(timeout_scraper_s),
+                usar_playwright_fallback=False,
+            ),
+        ),
+        ("Cemaco", CemacoScraper(timeout_s=int(timeout_scraper_s))),
         (
             "Intelaf",
             IntelafScraper(
@@ -155,6 +176,9 @@ async def precargar_termino_semilla(
         ("Rech", RechScraper(timeout_s=int(timeout_scraper_s))),
         ("Click Guatemala", ClickScraper(timeout_s=int(timeout_scraper_s))),
         ("Tera", TeraScraper(timeout_s=int(timeout_scraper_s))),
+        ("iStore", IStoreScraper(timeout_s=int(timeout_scraper_s))),
+        ("EPA", EpaScraper(timeout_s=int(timeout_scraper_s))),
+        ("Novex", NovexScraper(timeout_s=int(timeout_scraper_s))),
         ("Office Depot", OfficeDepotScraper(timeout_s=int(timeout_scraper_s))),
         (
             "Tecno Fácil",
@@ -171,17 +195,7 @@ async def precargar_termino_semilla(
         ("PriceSmart", PriceSmartScraper(timeout_s=int(timeout_scraper_s))),
         ("Oficiales", TiendasOficialesScraper(timeout_s=int(timeout_scraper_s))),
         ("Walmart Grupo", WalmartScraper(timeout_s=int(timeout_scraper_s))),
-        ("Cemaco", CemacoScraper(timeout_s=int(timeout_scraper_s))),
-        ("Pacifiko", PacifikoScraper()),
         ("La Torre", SuperScraper()),
-        (
-            "Tiendas Max",
-            MaxScraper(
-                headless=True,
-                timeout_s=int(timeout_scraper_s),
-                usar_playwright_fallback=False,
-            ),
-        ),
     ]
 
     listas = await asyncio.gather(
@@ -225,7 +239,8 @@ async def ejecutar_ciclo_precarga(
     ciclo_offset: int = 0,
 ) -> dict[str, Any]:
     """
-    Ejecuta un barrido completo o por lote rotativo sobre `seed_list_guatemala`.
+    Ejecuta primero las `busquedas_pendientes` registradas en Neon DB y a continuación
+    el barrido completo o por lote rotativo sobre `seed_list_guatemala`.
     """
     cola = seleccionar_lote_semilla(
         categoria_filtro=categoria_filtro,
@@ -241,17 +256,42 @@ async def ejecutar_ciclo_precarga(
     ESTADO_WORKER_PRECARGA["productos_procesados_ciclo"] = 0
     ESTADO_WORKER_PRECARGA["ofertas_evaluadas_ciclo"] = 0
     ESTADO_WORKER_PRECARGA["nuevos_precios_insertados_ciclo"] = 0
+    ESTADO_WORKER_PRECARGA["busquedas_pendientes_procesadas_ciclo"] = 0
 
     repositorio: PostgresOfertaRepository | None = None
     if persistir_en_db and (os.getenv("DATABASE_URL") or "").strip():
         repositorio = PostgresOfertaRepository()
+
+    # 1. Procesar búsquedas pendientes registradas cuando /api/buscar-en-vivo devolvió 0 resultados
+    if repositorio is not None:
+        pendientes = await asyncio.to_thread(
+            repositorio.obtener_busquedas_pendientes, 10
+        )
+        for idx_p, (termino_pend, cat_pend) in enumerate(pendientes, 1):
+            try:
+                res_pend = await precargar_termino_semilla(
+                    termino=termino_pend,
+                    categoria_db=cat_pend,
+                    repositorio=repositorio,
+                    persistir_en_db=True,
+                )
+                await asyncio.to_thread(
+                    repositorio.marcar_busqueda_pendiente_procesada,
+                    termino_pend,
+                    res_pend["relevantes"],
+                )
+                ESTADO_WORKER_PRECARGA["busquedas_pendientes_procesadas_ciclo"] = idx_p
+            except Exception as exc_pend:
+                logger.debug(
+                    "Worker omitió búsqueda pendiente '%s': %s", termino_pend, exc_pend
+                )
 
     total_evaluadas = 0
     total_insertados = 0
     detalles: list[dict[str, Any]] = []
 
     logger.info(
-        "Iniciando ciclo de precarga inteligente tecHunter v5.2 (%d términos semilla en cola, 3x/día)...",
+        "Iniciando ciclo de precarga inteligente tecHunter v5.4 (%d términos semilla en cola, 3x/día)...",
         len(cola),
     )
 

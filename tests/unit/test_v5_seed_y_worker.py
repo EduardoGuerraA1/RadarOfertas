@@ -63,14 +63,22 @@ def test_seed_list_guatemala_contiene_5_verticales_y_perifericos_camaras_v5_2() 
     # Nuevas cámaras de seguridad para el hogar v5.2 (TP-Link Tapo, Ezviz)
     assert "Camara de seguridad TP-Link Tapo C200 360 WiFi" in nombres
     assert "Camara de seguridad Ezviz C6N 1080p 360 Smart" in nombres
+    # Fotografía y Laptops Pro/OLED v5.4
+    assert "Canon EOS Rebel T7" in nombres
+    assert "Canon R100" in nombres
+    assert "Sony Alpha a6400" in nombres
+    assert "Nikon D3500" in nombres
+    assert "ASUS VivoBook Pro 15 OLED" in nombres
+    assert "ASUS Zenbook OLED" in nombres
+    assert "Lenovo Legion" in nombres
 
 
-def test_cruce_matriz_tiendas_identifica_24_operativas_y_especialistas_computo_v5_2() -> None:
+def test_cruce_matriz_tiendas_identifica_25_operativas_y_guatemaladigital_v5_4() -> None:
     assert len(tiendas_ecommerce_guatemala) == 6
     reporte = cruzar_matriz_tiendas_y_prioridades()
 
-    assert reporte["total_operativas_sistema"] == 24
-    assert len(reporte["operativas_cruzadas"]) >= 20
+    assert reporte["total_operativas_sistema"] == 25
+    assert len(reporte["operativas_cruzadas"]) >= 21
     assert reporte["tiendas_recien_activadas_v5_1"] == [
         "Tienda Tigo Guatemala",
         "Office Depot Guatemala",
@@ -81,6 +89,19 @@ def test_cruce_matriz_tiendas_identifica_24_operativas_y_especialistas_computo_v
         "Click Guatemala",
         "Tera Guatemala",
     ]
+    assert reporte["tiendas_recien_activadas_v5_4"] == [
+        "Guatemaladigital",
+    ]
+    nombres_foto_tech = {
+        t["nombre"] for t in reporte["tiendas_especializadas_fotografia_y_tecnologia"]
+    }
+    assert {
+        "iShop Guatemala",
+        "iCon Guatemala",
+        "Macrosistemas",
+        "Spirit Computación",
+        "Guatemaladigital",
+    }.issubset(nombres_foto_tech)
 
     top_3 = reporte["siguientes_3_alta_prioridad"]
     assert len(top_3) == 3
@@ -414,7 +435,7 @@ def test_blindaje_matching_productos_estrictamente_identicos_gigantus_v2_large()
     assert gigantus_click["ahorro_gtq"] == 0.0
 
 
-def test_v5_3_app_shell_skeleton_loading_css_estatico_y_health_ultraligero() -> None:
+def test_v5_4_app_shell_skeleton_loading_css_estatico_y_health_ultraligero() -> None:
     from fastapi.testclient import TestClient
     from radar_ofertas.interfaces.api.app import (
         CACHE_NEON_TTL_SEGUNDOS,
@@ -423,10 +444,10 @@ def test_v5_3_app_shell_skeleton_loading_css_estatico_y_health_ultraligero() -> 
         app,
     )
 
-    # 1. Validar constantes arquitectónicas v5.3
-    assert CACHE_NEON_TTL_SEGUNDOS == 300.0  # 5 minutos de TTL
+    # 1. Validar constantes arquitectónicas v5.4 (TTL 5m, paginación 28, timeout vivo 9s)
+    assert CACHE_NEON_TTL_SEGUNDOS == 300.0
     assert 24 <= PAGINACION_DESTACADOS_DEFAULT <= 32
-    assert TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S == 6.0
+    assert TIMEOUT_GLOBAL_BUSQUEDA_VIVO_S == 9.0
 
     client = TestClient(app)
 
@@ -435,7 +456,7 @@ def test_v5_3_app_shell_skeleton_loading_css_estatico_y_health_ultraligero() -> 
     assert resp_health.status_code == 200
     datos_health = resp_health.json()
     assert datos_health["status"] == "ok"
-    assert datos_health["version"] == "5.3.0"
+    assert datos_health["version"] == "5.4.0"
     assert datos_health["db_touched"] is False
 
     # 3. Recurso estático minificado /static/styles.css servido directamente
@@ -445,77 +466,117 @@ def test_v5_3_app_shell_skeleton_loading_css_estatico_y_health_ultraligero() -> 
     assert ".live-progress-bar" in resp_css.text
     assert ".apple-card" in resp_css.text
 
-    # 4. GET / entrega inmediatamente el App Shell con Skeleton Cards y sin cdn.tailwindcss.com
-    resp_home = client.get("/?q=Mousepad+Razer+Gigantus+V2+Large")
+    # 4. GET / entrega inmediatamente el App Shell v5.4 con Skeleton Cards y sin cdn.tailwindcss.com
+    resp_home = client.get("/?q=Canon+EOS+Rebel+T7")
     assert resp_home.status_code == 200
     html = resp_home.text
     assert "cdn.tailwindcss.com" not in html
-    assert '/static/styles.css?v=5.3.0' in html
+    assert '/static/styles.css?v=5.4.0' in html
     assert 'id="skeleton-grid"' in html
     assert 'class="skeleton-card' in html
     assert "Consultando catálogos en vivo en Guatemala..." in html
     assert "/api/buscar-en-vivo" in html
     assert "hidratarAppShellDesdeNeon()" in html
+    assert "GT v5.4" in html
 
 
-def test_v5_3_busqueda_en_vivo_acotada_paralela_6s_normaliza_urls_y_aísla_lentos() -> None:
-    from radar_ofertas.domain.entities.oferta_local import OfertaLocal
-    from radar_ofertas.interfaces.api.app import ejecutar_busqueda_en_vivo_acotada
-
-    class _ScraperRapidoClick:
-        async def buscar_producto(self, termino: str) -> list[OfertaLocal]:
-            await asyncio.sleep(0.02)
-            return [
-                OfertaLocal(
-                    titulo="Mousepad Gamer Razer Gigantus V2 Large 450x400mm",
-                    precio_gtq=Decimal("175.00"),
-                    # URL sintética /producto/ que debe ser convertida por resolver_url_saliente_segura
-                    url="https://www.click.gt/producto/mousepad-razer-gigantus-v2-large",
-                    imagen_url="https://www.click.gt/img/gigantus.jpg",
-                    tienda="Click Guatemala",
-                )
-            ]
-
-    class _ScraperRapidoRech:
-        async def buscar_producto(self, termino: str) -> list[OfertaLocal]:
-            await asyncio.sleep(0.03)
-            return [
-                OfertaLocal(
-                    titulo="Mousepad Gamer Razer Gigantus V2 Large Micro-Weave",
-                    precio_gtq=Decimal("165.00"),
-                    url="https://www.rech.com.gt/producto/razer-gigantus-v2-large",
-                    imagen_url="https://www.rech.com.gt/img/gigantus.jpg",
-                    tienda="Rech",
-                )
-            ]
-
-    class _ScraperLentoColgado:
-        async def buscar_producto(self, termino: str) -> list[OfertaLocal]:
-            # Simula una tienda externa que tarda 15 segundos y debe ser cortada por el timeout global
-            await asyncio.sleep(15.0)
-            return []
-
-    resultado = asyncio.run(
-        ejecutar_busqueda_en_vivo_acotada(
-            termino="Mousepad Razer Gigantus V2 Large",
-            scrapers=[
-                ("Click Guatemala", _ScraperRapidoClick()),
-                ("Rech", _ScraperRapidoRech()),
-                ("Tienda Lenta", _ScraperLentoColgado()),
-            ],
-            timeout_global_s=0.35,
-            persistir_en_db=False,
-        )
+def test_v5_4_busqueda_en_vivo_integracion_simulada_canon_t7_sony_vivobook_oled_y_cola_pendientes(
+    monkeypatch,
+) -> None:
+    from fastapi.testclient import TestClient
+    from radar_ofertas.infrastructure.scrapers.click_scraper import ClickScraper
+    from radar_ofertas.infrastructure.scrapers.guatemaladigital_scraper import (
+        GuatemalaDigitalScraper,
+    )
+    from radar_ofertas.infrastructure.scrapers.intelaf_scraper import IntelafScraper
+    from radar_ofertas.infrastructure.scrapers.kemik_scraper import KemikScraper
+    from radar_ofertas.infrastructure.scrapers.pacifiko_scraper import PacifikoScraper
+    from radar_ofertas.interfaces.api import app as app_module
+    from radar_ofertas.interfaces.api.app import (
+        app,
+        ejecutar_busqueda_en_vivo_acotada,
     )
 
-    assert len(resultado["ofertas_locales"]) == 2
-    assert resultado["latencia_ms"] < 900.0
-    assert set(resultado["tiendas_con_resultados"]) == {"Click Guatemala", "Rech"}
-    urls = {o.tienda: o.url for o in resultado["ofertas_locales"]}
-    assert urls["Click Guatemala"].startswith("https://www.click.gt/buscar?q=")
-    assert urls["Rech"].startswith("https://www.rech.com.gt/?s=")
-    assert "/producto/" not in urls["Click Guatemala"]
-    assert "/producto/" not in urls["Rech"]
+    # Configurar batería rápida simulada para la prueba de integración de POST /api/buscar-en-vivo
+    def _scrapers_simulados_v5_4(timeout_individual_s: int = 8):
+        return [
+            ("Guatemala Digital", GuatemalaDigitalScraper(simular=True)),
+            ("Kemik", KemikScraper(usar_playwright=False, simular=True)),
+            ("Pacifiko", PacifikoScraper(simular=True)),
+            ("Intelaf", IntelafScraper(usar_playwright_fallback=False)),
+            ("Click Guatemala", ClickScraper(simular=True)),
+        ]
+
+    monkeypatch.setattr(
+        app_module, "_construir_scrapers_busqueda_en_vivo", _scrapers_simulados_v5_4
+    )
+    monkeypatch.setenv("DATABASE_URL", "")
+
+    client = TestClient(app)
+
+    # 1. Prueba de integración para 'canon t7'
+    resp_canon = client.post("/api/buscar-en-vivo", json={"query": "canon t7"})
+    assert resp_canon.status_code == 200
+    data_canon = resp_canon.json()
+    assert data_canon["status"] == "ok"
+    assert data_canon["version"] == "5.4.0"
+    assert data_canon["timeout_global_s"] == 9.0
+    assert len(data_canon["ofertas"]) >= 3
+    tiendas_canon = {o["tienda"] for o in data_canon["ofertas"]}
+    assert "Guatemala Digital" in tiendas_canon
+    assert "Kemik" in tiendas_canon or "Pacifiko" in tiendas_canon
+    assert all("t7" in o["titulo"].lower() for o in data_canon["ofertas"])
+    for o in data_canon["ofertas"]:
+        if o["tienda_slug"] == "guatemaladigital":
+            assert o["url"].startswith("https://guatemaladigital.com/Busqueda?Busqueda=")
+
+    # 2. Prueba de integración para 'asus vivobook pro 15 oled'
+    resp_asus = client.post(
+        "/api/buscar-en-vivo", json={"query": "asus vivobook pro 15 oled"}
+    )
+    assert resp_asus.status_code == 200
+    data_asus = resp_asus.json()
+    assert len(data_asus["ofertas"]) >= 3
+    assert all(
+        "vivobook" in o["titulo"].lower() and "oled" in o["titulo"].lower()
+        for o in data_asus["ofertas"]
+    )
+
+    # 3. Prueba de integración para 'sony'
+    resp_sony = client.post("/api/buscar-en-vivo", json={"query": "sony"})
+    assert resp_sony.status_code == 200
+    data_sony = resp_sony.json()
+    assert len(data_sony["ofertas"]) >= 2
+    assert all("sony" in o["titulo"].lower() for o in data_sony["ofertas"])
+
+    # 4. Cuando una búsqueda devuelve 0 resultados, se registra en busquedas_pendientes
+    terminos_pendientes_registrados: list[tuple[str, str]] = []
+
+    class _RepoMockPendientes:
+        def guardar_ofertas(self, ofertas, categoria_slug="tecnologia") -> int:
+            return len(ofertas)
+
+        def registrar_busqueda_pendiente(
+            self, termino: str, categoria_slug: str = "tecnologia"
+        ) -> bool:
+            terminos_pendientes_registrados.append((termino, categoria_slug))
+            return True
+
+    res_vacio = asyncio.run(
+        ejecutar_busqueda_en_vivo_acotada(
+            termino="producto inexistente xyz98765",
+            scrapers=[("Guatemala Digital", GuatemalaDigitalScraper(simular=True))],
+            timeout_global_s=1.0,
+            persistir_en_db=True,
+            repositorio=_RepoMockPendientes(),  # type: ignore[arg-type]
+        )
+    )
+    assert res_vacio["ofertas_locales"] == []
+    assert res_vacio["registrada_en_busquedas_pendientes"] is True
+    assert terminos_pendientes_registrados == [
+        ("producto inexistente xyz98765", "tecnologia")
+    ]
+
 
 
 

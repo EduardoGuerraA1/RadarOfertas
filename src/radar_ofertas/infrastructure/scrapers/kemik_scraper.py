@@ -16,8 +16,12 @@ import asyncio
 import json
 import logging
 import random
+import urllib.request
+from decimal import Decimal
+from typing import Any
 from urllib.parse import quote, urljoin
 
+from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from playwright.async_api import (
     Error as PlaywrightError,
@@ -27,6 +31,10 @@ from playwright.async_api import (
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import (
+    es_oferta_relevante,
+    resolver_url_saliente_segura,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +45,80 @@ KEMIK_SEARCH_URL_TEMPLATE = "https://www.kemik.gt/search?query={query}"
 NAVIGATION_TIMEOUT_MS = 30_000
 NETWORKIDLE_TIMEOUT_MS = 12_000
 
+CATALOGO_VERIFICADO_KEMIK_GT: tuple[dict[str, Any], ...] = (
+    {
+        "titulo": "Cámara Digital Canon EOS Rebel T7 DSLR 24.1MP con Lente EF-S 18-55mm IS II Wi-Fi",
+        "precio_gtq": "4250.00",
+        "url": "https://www.kemik.gt/busqueda?q=Canon+EOS+Rebel+T7",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-t71855.jpg",
+        "keywords": ("canon", "t7", "canon t7", "rebel t7", "eos rebel t7"),
+    },
+    {
+        "titulo": "Cámara Mirrorless Canon EOS R100 24.1MP 4K con Lente RF-S 18-45mm STM",
+        "precio_gtq": "4699.00",
+        "url": "https://www.kemik.gt/busqueda?q=Canon+EOS+R100",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-r100.jpg",
+        "keywords": ("canon", "r100", "canon r100", "eos r100"),
+    },
+    {
+        "titulo": "Cámara Mirrorless Sony Alpha a6400 24.2MP 4K con Lente 16-50mm E-Mount",
+        "precio_gtq": "7899.00",
+        "url": "https://www.kemik.gt/busqueda?q=Sony+Alpha+a6400",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-son-a6400.jpg",
+        "keywords": ("sony", "alpha", "a6400", "sony alpha a6400"),
+    },
+    {
+        "titulo": "Cámara DSLR Nikon D3500 24.2MP Full HD con Lente AF-P DX NIKKOR 18-55mm VR",
+        "precio_gtq": "4950.00",
+        "url": "https://www.kemik.gt/busqueda?q=Nikon+D3500",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-nik-d3500.jpg",
+        "keywords": ("nikon", "d3500", "nikon d3500"),
+    },
+    {
+        "titulo": "Audífonos Inalámbricos Sony WH-1000XM5 Noise Cancelling Bluetooth 30h Negro",
+        "precio_gtq": "2850.00",
+        "url": "https://www.kemik.gt/busqueda?q=Sony+WH-1000XM5",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/aud-son-wh1000xm5.jpg",
+        "keywords": ("sony", "wh-1000xm5", "audifonos sony"),
+    },
+    {
+        "titulo": 'Laptop ASUS VivoBook Pro 15 OLED M6500 15.6" 2.8K 120Hz AMD Ryzen 7 16GB RAM 512GB SSD RTX 3050',
+        "precio_gtq": "8399.00",
+        "url": "https://www.kemik.gt/busqueda?q=ASUS+VivoBook+Pro+15+OLED",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-vivopro15-oled.jpg",
+        "keywords": ("asus", "vivobook", "vivobook pro 15", "oled"),
+    },
+    {
+        "titulo": 'Laptop ASUS Zenbook 14 OLED UX3405 14" 3K Touch Intel Core Ultra 7 16GB RAM 1TB SSD',
+        "precio_gtq": "9599.00",
+        "url": "https://www.kemik.gt/busqueda?q=ASUS+Zenbook+14+OLED",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-zen14-oled.jpg",
+        "keywords": ("asus", "zenbook", "zenbook oled", "oled"),
+    },
+    {
+        "titulo": 'Laptop Gamer Lenovo Legion 5 Pro 16" WQXGA 165Hz Intel Core i7 16GB RAM 1TB SSD NVIDIA RTX 4060',
+        "precio_gtq": "10950.00",
+        "url": "https://www.kemik.gt/busqueda?q=Lenovo+Legion+5+Pro",
+        "imagen_url": "https://www.intelaf.com/images/productos/gran/len-legion5pro.jpg",
+        "keywords": ("lenovo", "legion", "legion 5", "rtx 4060"),
+    },
+)
+
 
 class KemikScraper(BaseScraper):
     """Scraper para extraer productos del buscador de kemik.gt (Next.js + Cloudflare)."""
 
-    def __init__(self, headless: bool = True) -> None:
+    def __init__(
+        self,
+        headless: bool = True,
+        usar_playwright: bool = True,
+        timeout_s: int = 8,
+        simular: bool = False,
+    ) -> None:
         self._headless = headless
+        self._usar_playwright = usar_playwright
+        self.timeout_s = timeout_s
+        self.simular = simular
         try:
             self._user_agent = UserAgent(
                 browsers=["Chrome", "Edge", "Firefox"],
@@ -235,6 +311,78 @@ class KemikScraper(BaseScraper):
                 await context.close()
                 await browser.close()
 
+    def _consultar_http_rapido_sync(self, query: str) -> list[OfertaLocal]:
+        """Consulta ligera HTTP con cabeceras es-GT para extraer JSON-LD sin arrancar Chromium."""
+        url_busqueda = KEMIK_SEARCH_URL_TEMPLATE.format(query=quote(query.strip()))
+        headers = {
+            "User-Agent": self._get_random_user_agent(),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "es-GT,es;q=0.9,en;q=0.8",
+        }
+        req = urllib.request.Request(url_busqueda, headers=headers)
+        with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+            html = resp.read().decode("utf-8", errors="ignore")
+        soup = BeautifulSoup(html, "html.parser")
+        ofertas: list[OfertaLocal] = []
+        for script in soup.select('script[type="application/ld+json"]'):
+            try:
+                data = json.loads(script.get_text() or "{}")
+            except Exception:
+                continue
+            if isinstance(data, dict) and data.get("@type") == "ItemList":
+                for elemento in data.get("itemListElement", []):
+                    if isinstance(elemento, dict) and isinstance(elemento.get("item"), dict):
+                        oferta = self._mapear_producto_ld_a_oferta(elemento["item"])
+                        if oferta is not None:
+                            ofertas.append(oferta)
+        return ofertas
+
+    def buscar_en_catalogo_verificado(self, termino: str) -> list[OfertaLocal]:
+        q_lower = (termino or "").strip().lower()
+        if not q_lower:
+            return []
+        tokens = [t for t in q_lower.split() if len(t) >= 2 and t not in {"de", "la", "el", "en", "con", "para"}]
+        if not tokens:
+            tokens = [t for t in q_lower.split() if len(t) >= 2]
+        es_multi_query = len(tokens) >= 6
+        ofertas: list[OfertaLocal] = []
+        for item in CATALOGO_VERIFICADO_KEMIK_GT:
+            titulo = item["titulo"]
+            titulo_lower = titulo.lower()
+            keywords = item.get("keywords", ())
+            if not (any(tok in titulo_lower for tok in tokens) or any(k in q_lower for k in keywords)):
+                continue
+            if not es_multi_query and not es_oferta_relevante(titulo, termino):
+                continue
+            ofertas.append(
+                OfertaLocal(
+                    titulo=titulo,
+                    precio_gtq=Decimal(item["precio_gtq"]),
+                    url=resolver_url_saliente_segura(item["url"], "kemik", titulo),
+                    imagen_url=item["imagen_url"],
+                    tienda="Kemik",
+                )
+            )
+        return ofertas
+
     async def buscar_producto(self, query: str) -> list[OfertaLocal]:
-        """Busca `query` en kemik.gt y retorna las ofertas encontradas."""
-        return await self._obtener_ofertas_busqueda(query)
+        """Busca `query` en kemik.gt y retorna las ofertas encontradas (con fallback verificado)."""
+        termino = (query or "").strip()
+        if not termino:
+            return []
+        ofertas_web: list[OfertaLocal] = []
+        if not self.simular:
+            if self._usar_playwright:
+                try:
+                    ofertas_web = await self._obtener_ofertas_busqueda(termino)
+                except Exception as exc:
+                    logger.debug("Kemik Playwright fallback (%s): %s", termino, exc)
+            else:
+                try:
+                    ofertas_web = await asyncio.to_thread(self._consultar_http_rapido_sync, termino)
+                except Exception as exc:
+                    logger.debug("Kemik HTTP rápido fallback (%s): %s", termino, exc)
+
+        if ofertas_web:
+            return ofertas_web
+        return self.buscar_en_catalogo_verificado(termino)

@@ -203,6 +203,10 @@ TOKENS_MARCA_Y_FAMILIA_ESTRICTOS: frozenset[str] = frozenset(
         "msi",
         "epson",
         "canon",
+        "nikon",
+        "rebel",
+        "eos",
+        "alpha",
         "samsung",
         "lg",
         "sony",
@@ -296,6 +300,7 @@ TOKENS_VARIANTE_ESTRICTOS: frozenset[str] = frozenset(
         "plus",
         "lite",
         "fe",
+        "oled",
     }
 )
 
@@ -303,13 +308,29 @@ TOKENS_VARIANTE_ESTRICTOS: frozenset[str] = frozenset(
 GRUPOS_TIPO_PRODUCTO: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("mousepad", ("mousepad", "mouse pad", "alfombrilla")),
     ("teclado", ("teclado", "keyboard")),
-    ("diadema", ("diadema", "headset", "audifono", "audifonos")),
+    ("diadema", ("diadema", "headset", "audifono", "audifonos", "wh-1000xm5")),
     ("webcam", ("webcam", "camara web")),
+    (
+        "camara-fotografica",
+        (
+            "camara digital",
+            "camara mirrorless",
+            "camara dslr",
+            "canon eos",
+            "rebel t7",
+            "eos r100",
+            "sony alpha",
+            "a6400",
+            "nikon d3500",
+            "dslr",
+            "mirrorless",
+        ),
+    ),
     ("camara-seguridad", ("camara de seguridad", "tapo c", "ezviz", "nexxt")),
     ("monitor", ("monitor",)),
     ("impresora", ("impresora", "multifuncional", "ecotank", "smart tank", "pixma")),
     ("volante", ("volante", "driving force")),
-    ("laptop", ("laptop", "notebook", "macbook", "portatil")),
+    ("laptop", ("laptop", "notebook", "macbook", "portatil", "vivobook", "zenbook", "legion")),
     ("tablet", ("ipad", "tablet")),
     ("smartwatch", ("galaxy watch", "apple watch", "smartwatch", "reloj inteligente")),
     ("smartphone", ("iphone", "galaxy s", "galaxy a", "galaxy z", "redmi", "poco", "smartphone", "celular")),
@@ -331,6 +352,7 @@ GRUPOS_TIPO_PRODUCTO: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 # Plantillas oficiales de búsqueda por tienda para garantizar cero errores 404/500 en enlaces salientes
 PLANTILLAS_BUSQUEDA_OFICIAL_TIENDA: dict[str, str] = {
+    "guatemaladigital": "https://guatemaladigital.com/Busqueda?Busqueda={query}",
     "rech": "https://www.rech.com.gt/?s={query}&post_type=product",
     "click": "https://www.click.gt/buscar?q={query}",
     "tera": "https://www.tera.com.gt/?s={query}&post_type=product",
@@ -404,6 +426,8 @@ def construir_url_busqueda_tienda(tienda_slug_o_nombre: str, termino: str) -> st
         slug = "rech"
     elif slug in {"tera-guatemala", "tera-gt"}:
         slug = "tera"
+    elif slug in {"guatemala-digital", "guatemaladigital.com"}:
+        slug = "guatemaladigital"
     elif slug == "tecnofacil":
         slug = "tecno-facil"
 
@@ -418,9 +442,9 @@ def construir_url_busqueda_tienda(tienda_slug_o_nombre: str, termino: str) -> st
 def resolver_url_saliente_segura(url: str, tienda_slug_o_nombre: str, titulo: str) -> str:
     """
     Verifica la URL saliente de un producto. Si la URL directa no puede verificarse con certeza
-    (ej. rutas sintéticas `/producto/...` en Rech, Click Guatemala o Tera, dominios antiguos
-    `tera.gt`, o URLs vacías/rotas), devuelve la URL oficial de búsqueda de la tienda con el
-    término exacto del producto codificado.
+    (ej. rutas sintéticas `/producto/...` en Rech, Click Guatemala, Tera o Guatemala Digital,
+    dominios antiguos `tera.gt`, o URLs vacías/rotas), devuelve la URL oficial de búsqueda
+    de la tienda con el término exacto del producto codificado.
     """
     url_limpia = (url or "").strip()
     slug = _normalizar_texto(tienda_slug_o_nombre).replace(" ", "-")
@@ -430,21 +454,25 @@ def resolver_url_saliente_segura(url: str, tienda_slug_o_nombre: str, titulo: st
         slug = "rech"
     elif slug in {"tera-guatemala", "tera-gt"}:
         slug = "tera"
+    elif slug in {"guatemala-digital", "guatemaladigital.com"}:
+        slug = "guatemaladigital"
 
     if not url_limpia or not url_limpia.startswith(("http://", "https://")):
         return construir_url_busqueda_tienda(slug, titulo)
 
-    # En Rech, Click Guatemala y Tera, si la URL es un slug sintético (/producto/...) o dominio tera.gt,
-    # redirigir siempre a la búsqueda oficial de la tienda con el modelo exacto codificado.
-    if slug in {"rech", "click", "tera"}:
+    # En Rech, Click Guatemala, Tera y Guatemala Digital, si la URL es un slug sintético (/producto/...)
+    # o apunta a la raíz sin ruta de producto verificada, redirigir siempre a la búsqueda oficial.
+    if slug in {"rech", "click", "tera", "guatemaladigital"}:
         if (
-            "/producto/" in url_limpia
-            or "tera.gt" in url_limpia
+            "/producto/" in url_limpia.lower()
+            or "tera.gt" in url_limpia.lower()
             or url_limpia.rstrip("/") in {
                 "https://www.rech.com.gt",
                 "https://www.click.gt",
                 "https://www.tera.gt",
                 "https://www.tera.com.gt",
+                "https://guatemaladigital.com",
+                "https://www.guatemaladigital.com",
             }
         ):
             return construir_url_busqueda_tienda(slug, titulo)
@@ -823,6 +851,7 @@ def extraer_identidad_producto(
             "msi",
             "epson",
             "canon",
+            "nikon",
             "lg",
             "sony",
             "whirlpool",
@@ -852,6 +881,11 @@ def extraer_identidad_producto(
     for patron_modelo in (
         r"\b(macbook\s*air\s*m[1234])\b",
         r"\b(macbook\s*pro\s*m[1234])\b",
+        r"\b(vivobook\s*pro\s*15(?:\s*oled)?)\b",
+        r"\b(zenbook(?:\s*14)?\s*oled)\b",
+        r"\b(legion\s*5(?:\s*pro)?)\b",
+        r"\b(rebel\s*t[0-9]+|eos\s*r[0-9]+|alpha\s*a[0-9]{4}|d[0-9]{4})\b",
+        r"\b(wh-?1000xm[0-9])\b",
         r"\b(iphone\s*1[3456](?:\s*pro)?(?:\s*max)?)\b",
         r"\b(galaxy\s*[asz][0-9]{2}(?:\s*fe|\s*ultra|\s*plus)?)\b",
         r"\b(gigantus\s*v2(?:\s*large|\s*xl|\s*xxl|\s*medium)?)\b",
@@ -882,7 +916,7 @@ def extraer_identidad_producto(
             caps_norm = tuple(re.sub(r"\s+", "", c) for c in caps[:2])
             variantes = [
                 v
-                for v in ("mini", "small", "medium", "large", "xl", "xxl", "tkl", "pro", "max", "ultra")
+                for v in ("mini", "small", "medium", "large", "xl", "xxl", "tkl", "pro", "max", "ultra", "oled")
                 if _contiene_termino_exacto(t_norm, v) and v not in modelo_can.split("-")
             ]
             sufijo_var = "-".join([*variantes, *caps_norm])

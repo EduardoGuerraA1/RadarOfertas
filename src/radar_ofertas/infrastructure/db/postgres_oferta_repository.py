@@ -159,6 +159,8 @@ class PostgresOfertaRepository(OfertaRepository):
             return "rech"
         if slug in {"tera-guatemala", "tera-gt"}:
             return "tera"
+        if slug in {"guatemala-digital", "guatemaladigital.com"}:
+            return "guatemaladigital"
         return slug
 
     @classmethod
@@ -166,6 +168,7 @@ class PostgresOfertaRepository(OfertaRepository):
         """Obtiene (o crea si no existe) el registro de la tienda en la tabla `tiendas`."""
         slug = cls._normalizar_slug_tienda(nombre_tienda)
         urls_conocidas = {
+            "guatemaladigital": "https://guatemaladigital.com",
             "kemik": "https://www.kemik.gt",
             "pacifiko": "https://www.pacifiko.com",
             "la-torre": "https://www.latorre.com.gt",
@@ -480,6 +483,7 @@ class PostgresOfertaRepository(OfertaRepository):
             "MSI",
             "Epson",
             "Canon",
+            "Nikon",
             "RCA",
             "Garmin",
             "JBL",
@@ -692,6 +696,7 @@ class PostgresOfertaRepository(OfertaRepository):
         params: list[Any] = []
 
         if tienda_limpia in {
+            "guatemaladigital",
             "kemik",
             "pacifiko",
             "la-torre",
@@ -816,4 +821,123 @@ class PostgresOfertaRepository(OfertaRepository):
         }:
             return [o for o in filtrados if o.get("categoria_ui") == categoria_limpia]
         return filtrados
+
+    @staticmethod
+    def _asegurar_tabla_busquedas_pendientes(cursor) -> None:
+        """Crea (si no existe) la tabla `busquedas_pendientes` en Neon DB para el worker en segundo plano."""
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS busquedas_pendientes (
+                id SERIAL PRIMARY KEY,
+                termino VARCHAR(255) UNIQUE NOT NULL,
+                categoria_slug VARCHAR(64) NOT NULL DEFAULT 'tecnologia',
+                estado VARCHAR(32) NOT NULL DEFAULT 'pendiente',
+                intentos INTEGER NOT NULL DEFAULT 1,
+                ofertas_encontradas INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+
+    def registrar_busqueda_pendiente(
+        self, termino: str, categoria_slug: str = "tecnologia"
+    ) -> bool:
+        """
+        Registra en `busquedas_pendientes` un término cuya búsqueda en vivo devolvió 0 resultados
+        por bloqueos externos en la nube, para que `worker_precarga.py` lo procese en su próxima corrida.
+        """
+        termino_limpio = (termino or "").strip()
+        if not termino_limpio:
+            return False
+        cat_limpia = (categoria_slug or "tecnologia").strip().lower()
+        conn = self._get_connection()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    self._asegurar_tabla_busquedas_pendientes(cursor)
+                    cursor.execute(
+                        """
+                        INSERT INTO busquedas_pendientes (termino, categoria_slug, estado, intentos, updated_at)
+                        VALUES (%s, %s, 'pendiente', 1, NOW())
+                        ON CONFLICT (termino) DO UPDATE
+                            SET estado = 'pendiente',
+                                categoria_slug = EXCLUDED.categoria_slug,
+                                intentos = busquedas_pendientes.intentos + 1,
+                                updated_at = NOW();
+                        """,
+                        (termino_limpio, cat_limpia),
+                    )
+            return True
+        except Exception as exc:
+            logger.warning(
+                "No se pudo registrar '%s' en busquedas_pendientes: %s",
+                termino_limpio,
+                exc,
+            )
+            return False
+        finally:
+            conn.close()
+
+    def obtener_busquedas_pendientes(
+        self, limite: int = 10
+    ) -> list[tuple[str, str]]:
+        """
+        Obtiene hasta `limite` tuplas `(termino, categoria_slug)` en estado `'pendiente'`
+        desde `busquedas_pendientes` para que `worker_precarga.py` las procese prioritariamente.
+        """
+        conn = self._get_connection()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    self._asegurar_tabla_busquedas_pendientes(cursor)
+                    cursor.execute(
+                        """
+                        SELECT termino, categoria_slug
+                        FROM busquedas_pendientes
+                        WHERE estado = 'pendiente'
+                        ORDER BY intentos DESC, updated_at ASC
+                        LIMIT %s;
+                        """,
+                        (int(limite),),
+                    )
+                    filas = cursor.fetchall()
+            return [(str(f[0]), str(f[1] or "tecnologia")) for f in filas]
+        except Exception as exc:
+            logger.debug("Consulta de busquedas_pendientes omitida: %s", exc)
+            return []
+        finally:
+            conn.close()
+
+    def marcar_busqueda_pendiente_procesada(
+        self, termino: str, ofertas_encontradas: int = 0
+    ) -> None:
+        """Actualiza el estado de un término en `busquedas_pendientes` tras ser procesado por el worker."""
+        termino_limpio = (termino or "").strip()
+        if not termino_limpio:
+            return
+        nuevo_estado = "procesada" if ofertas_encontradas > 0 else "sin_resultados"
+        conn = self._get_connection()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    self._asegurar_tabla_busquedas_pendientes(cursor)
+                    cursor.execute(
+                        """
+                        UPDATE busquedas_pendientes
+                        SET estado = %s,
+                            ofertas_encontradas = %s,
+                            updated_at = NOW()
+                        WHERE LOWER(termino) = LOWER(%s);
+                        """,
+                        (nuevo_estado, int(ofertas_encontradas), termino_limpio),
+                    )
+        except Exception as exc:
+            logger.debug(
+                "No se pudo actualizar estado de busquedas_pendientes para '%s': %s",
+                termino_limpio,
+                exc,
+            )
+        finally:
+            conn.close()
 
