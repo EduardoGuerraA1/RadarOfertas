@@ -18,67 +18,18 @@ from bs4 import BeautifulSoup
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import (
+    es_url_producto_directa_valida,
+    filtrar_ofertas_relevantes,
+)
 
 logger = logging.getLogger(__name__)
-
-
-CATALOGO_VERIFICADO_TROPIGAS_GT: tuple[dict[str, Any], ...] = (
-    {
-        "titulo": "Refrigeradora Mabe 11 Pies Top Mount RMA1130JM0 Inox",
-        "precio_gtq": "3199.00",
-        "url": "https://www.almacenestropigas.com/guatemala/refrigeradora-mabe-11-pies-rma1130jm0/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/r/m/rma1130jm0_1.jpg",
-        "keywords": ("refrigeradora", "mabe", "11 pies", "linea blanca", "hogar"),
-    },
-    {
-        "titulo": "Refrigeradora LG 14 Pies Top Freezer Smart Inverter GT44BPP",
-        "precio_gtq": "4799.00",
-        "url": "https://www.almacenestropigas.com/guatemala/refrigeradora-lg-14-pies-inverter-gt44bpp/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/g/t/gt44bpp_1.jpg",
-        "keywords": ("refrigeradora", "lg", "14 pies", "inverter", "linea blanca", "hogar"),
-    },
-    {
-        "titulo": "Refrigeradora Samsung 11 Pies Digital Inverter RT29K571JS8",
-        "precio_gtq": "3699.00",
-        "url": "https://www.almacenestropigas.com/guatemala/refrigeradora-samsung-11-pies-rt29k571js8/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/r/t/rt29k571js8_1.jpg",
-        "keywords": ("refrigeradora", "samsung", "11 pies", "inverter", "linea blanca", "hogar"),
-    },
-    {
-        "titulo": "Estufa de Gas Mabe 30 Pulgadas 6 Quemadores EM7620BAP0",
-        "precio_gtq": "2599.00",
-        "url": "https://www.almacenestropigas.com/guatemala/estufa-de-gas-mabe-30-pulgadas-em7620bap0/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/e/m/em7620bap0_1.jpg",
-        "keywords": ("estufa", "mabe", "30 pulgadas", "estufa de gas", "hogar"),
-    },
-    {
-        "titulo": "Lavadora Mabe 18 Kg Aqua Saver Green Carga Superior LMA78113VBAB0",
-        "precio_gtq": "3399.00",
-        "url": "https://www.almacenestropigas.com/guatemala/lavadora-mabe-18-kg-aqua-saver-lma78113vbab0/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/l/m/lma78113vbab0_1.jpg",
-        "keywords": ("lavadora", "mabe", "18 kg", "aqua saver", "linea blanca", "hogar"),
-    },
-    {
-        "titulo": "Lavadora LG 19 Kg Smart Inverter Carga Superior WT19BSB",
-        "precio_gtq": "3899.00",
-        "url": "https://www.almacenestropigas.com/guatemala/lavadora-lg-19-kg-smart-inverter-wt19bsb/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/w/t/wt19bsb_1.jpg",
-        "keywords": ("lavadora", "lg", "19 kg", "inverter", "linea blanca", "hogar"),
-    },
-    {
-        "titulo": "Horno Microondas LG 1.1 Pies Cúbicos Smart Inverter NeoChef MS1149CS",
-        "precio_gtq": "999.00",
-        "url": "https://www.almacenestropigas.com/guatemala/horno-microondas-lg-1-1-pies-ms1149cs/p",
-        "imagen_url": "https://www.max.com.gt/media/catalog/product/m/s/ms1149cs_1.jpg",
-        "keywords": ("microondas", "horno microondas", "lg", "1.1 pies", "hogar"),
-    },
-)
 
 
 class TropigasScraper(BaseScraper):
     """
     Scraper asíncrono funcional para Almacenes Tropigas Guatemala (`https://www.almacenestropigas.com/guatemala`).
-    Soporta extracción Magento / Unicomer y catálogo verificado de Línea Blanca y Hogar en GTQ.
+    Consulta en vivo la API VTEX oficial de Almacenes Tropigas GT y HTML sin inventar catálogos estáticos (v5.5).
     """
 
     BASE_URL = "https://www.almacenestropigas.com/guatemala"
@@ -106,28 +57,75 @@ class TropigasScraper(BaseScraper):
         except InvalidOperation:
             return None
 
-    def parsear_respuesta_unicomer(self, payload: dict[str, Any]) -> list[OfertaLocal]:
+    def parsear_respuesta_unicomer(self, payload: dict[str, Any] | list[Any]) -> list[OfertaLocal]:
         """
-        Convierte la respuesta de catálogo de Almacenes Tropigas GT en entidades `OfertaLocal`.
+        Convierte la respuesta JSON (API VTEX o Unicomer) de Almacenes Tropigas GT en entidades `OfertaLocal`.
         """
-        items = payload.get("items", []) if isinstance(payload, dict) else []
+        if isinstance(payload, dict):
+            items = payload.get("items", [])
+        elif isinstance(payload, list):
+            items = payload
+        else:
+            items = []
+
         ofertas: list[OfertaLocal] = []
+        urls_vistas: set[str] = set()
         for item in items:
             if not isinstance(item, dict):
                 continue
+            # Formato VTEX catalog_system/pub/products/search
+            if "productName" in item and isinstance(item.get("items"), list):
+                titulo = str(item.get("productName") or "").strip()
+                link = str(item.get("link") or "").strip()
+                skus = item.get("items") or []
+                if not titulo or not link or not skus:
+                    continue
+                sku0 = skus[0] if isinstance(skus[0], dict) else {}
+                imagenes = sku0.get("images") or []
+                imagen_url = ""
+                if isinstance(imagenes, list) and imagenes and isinstance(imagenes[0], dict):
+                    imagen_url = str(imagenes[0].get("imageUrl") or "").strip()
+                sellers = sku0.get("sellers") or []
+                precio_raw = None
+                if isinstance(sellers, list) and sellers and isinstance(sellers[0], dict):
+                    comm = sellers[0].get("commertialOffer") or {}
+                    if isinstance(comm, dict):
+                        precio_raw = comm.get("Price")
+                precio = self._limpiar_precio(precio_raw)
+                if precio is None or not es_url_producto_directa_valida(link) or link in urls_vistas:
+                    continue
+                urls_vistas.add(link)
+                ofertas.append(
+                    OfertaLocal(
+                        titulo=titulo,
+                        precio_gtq=precio,
+                        url=link,
+                        imagen_url=imagen_url,
+                        tienda=self.NOMBRE_TIENDA,
+                    )
+                )
+                continue
+
+            # Formato diccionario genérico Unicomer
             titulo = str(item.get("name") or "").strip()
             precio_raw = item.get("price") or item.get("final_price")
             url = str(item.get("url") or "").strip()
             precio = self._limpiar_precio(precio_raw)
             if not titulo or precio is None or not url:
                 continue
+            url_abs = (
+                url
+                if url.startswith("http")
+                else f"{self.BASE_URL}/{url.lstrip('/')}"
+            )
+            if not es_url_producto_directa_valida(url_abs) or url_abs in urls_vistas:
+                continue
+            urls_vistas.add(url_abs)
             ofertas.append(
                 OfertaLocal(
                     titulo=titulo,
                     precio_gtq=precio,
-                    url=url
-                    if url.startswith("http")
-                    else f"{self.BASE_URL}/{url.lstrip('/')}",
+                    url=url_abs,
                     imagen_url=str(item.get("image") or ""),
                     tienda=self.NOMBRE_TIENDA,
                 )
@@ -161,7 +159,7 @@ class TropigasScraper(BaseScraper):
                 if href.startswith("http")
                 else urllib.parse.urljoin(self.BASE_URL + "/", href.lstrip("/"))
             )
-            if url in urls_vistas:
+            if not es_url_producto_directa_valida(url) or url in urls_vistas:
                 continue
             urls_vistas.add(url)
             img = item.select_one("img")
@@ -181,36 +179,10 @@ class TropigasScraper(BaseScraper):
             )
         return ofertas
 
-    def buscar_en_catalogo_verificado(self, termino: str) -> list[OfertaLocal]:
-        q_lower = (termino or "").strip().lower()
-        if not q_lower:
-            return []
-        tokens = [t for t in q_lower.split() if len(t) >= 2]
-        ofertas: list[OfertaLocal] = []
-
-        for item in CATALOGO_VERIFICADO_TROPIGAS_GT:
-            titulo_lower = item["titulo"].lower()
-            keywords = item.get("keywords", ())
-            coincide = any(k in q_lower or q_lower in k for k in keywords) or any(
-                tok in titulo_lower for tok in tokens
-            )
-            if not coincide:
-                continue
-            ofertas.append(
-                OfertaLocal(
-                    titulo=item["titulo"],
-                    precio_gtq=Decimal(item["precio_gtq"]),
-                    url=item["url"],
-                    imagen_url=item["imagen_url"],
-                    tienda=self.NOMBRE_TIENDA,
-                )
-            )
-        return ofertas
-
     def _consultar_web_sync(self, termino: str) -> list[OfertaLocal]:
         url = (
-            f"{self.BASE_URL}/catalogsearch/result/"
-            f"?q={urllib.parse.quote_plus(termino)}"
+            f"{self.BASE_URL}/api/catalog_system/pub/products/search/"
+            f"?ft={urllib.parse.quote(termino)}&_from=0&_to=11"
         )
         req = urllib.request.Request(
             url,
@@ -219,36 +191,29 @@ class TropigasScraper(BaseScraper):
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
                 ),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept": "application/json",
             },
         )
         with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
-        return self.parsear_html(html)
+            raw = resp.read().decode("utf-8", errors="ignore")
+        payload = json.loads(raw)
+        return self.parsear_respuesta_unicomer(payload)
 
     async def buscar_producto(self, termino_busqueda: str) -> list[OfertaLocal]:
         termino = (termino_busqueda or "").strip()
-        if not termino or not self.habilitado:
+        if not termino or not self.habilitado or self.simular:
             return []
 
-        ofertas_web: list[OfertaLocal] = []
-        if not self.simular:
-            try:
-                ofertas_web = await asyncio.to_thread(self._consultar_web_sync, termino)
-            except Exception as exc:
-                logger.debug(
-                    "Tropigas GT web fallback (%s) para '%s'.",
-                    exc.__class__.__name__,
-                    termino,
-                )
+        try:
+            ofertas_web = await asyncio.to_thread(self._consultar_web_sync, termino)
+        except Exception as exc:
+            logger.debug(
+                "Tropigas GT web error (%s) para '%s'.",
+                exc.__class__.__name__,
+                termino,
+            )
+            return []
 
-        ofertas_cat = self.buscar_en_catalogo_verificado(termino)
-        urls_vistas = {o.url for o in ofertas_web}
-        combinadas = list(ofertas_web)
-        for o_cat in ofertas_cat:
-            if o_cat.url not in urls_vistas:
-                combinadas.append(o_cat)
-                urls_vistas.add(o_cat.url)
-
-        logger.info("Tropigas GT ('%s'): %d ofertas extraídas.", termino, len(combinadas))
-        return combinadas
+        ofertas_filtradas = filtrar_ofertas_relevantes(ofertas_web, termino)
+        logger.info("Tropigas GT ('%s'): %d ofertas reales extraídas.", termino, len(ofertas_filtradas))
+        return ofertas_filtradas

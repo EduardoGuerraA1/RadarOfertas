@@ -20,75 +20,19 @@ from bs4 import BeautifulSoup
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import (
+    es_url_producto_directa_valida,
+    filtrar_ofertas_relevantes,
+)
 
 logger = logging.getLogger(__name__)
-
-
-CATALOGO_VERIFICADO_NOVEX_GT: tuple[dict[str, Any], ...] = (
-    {
-        "titulo": "Taladro Percutor Inalámbrico DeWalt DCD776C2 20V Max 1/2\" con 2 Baterías y Cargador",
-        "precio_gtq": "1395.00",
-        "url": "https://www.novex.com.gt/catalogo/29140/taladro_percutor_inalambrico_dewalt_dcd776c2_20v_max.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/29140.jpg",
-        "keywords": ("taladro", "dewalt", "dcd776", "dcd776c2", "percutor", "barreno", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Rotomartillo Inalámbrico Brushless DeWalt DCD796D2 20V Max XR 1/2\" Industrial",
-        "precio_gtq": "2150.00",
-        "url": "https://www.novex.com.gt/catalogo/34812/taladro_rotomartillo_brushless_dewalt_dcd796d2_20v.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/34812.jpg",
-        "keywords": ("taladro", "dewalt", "dcd796", "rotomartillo", "brushless", "percutor", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Percutor Bosch GSB 13 RE 650W 1/2\" Velocidad Variable Reversible",
-        "precio_gtq": "589.00",
-        "url": "https://www.novex.com.gt/catalogo/18450/taladro_percutor_bosch_gsb_13_re_650w.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/18450.jpg",
-        "keywords": ("taladro", "bosch", "gsb", "percutor", "barreno", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Percutor Industrial Bosch GSB 20-2 RE 800W 1/2\" 2 Velocidades",
-        "precio_gtq": "1849.00",
-        "url": "https://www.novex.com.gt/catalogo/22310/taladro_percutor_bosch_gsb_20_2_800w.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/22310.jpg",
-        "keywords": ("taladro", "bosch", "gsb20", "gsb 20-2", "percutor", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Rotomartillo Truper ROTO-1/2A7 650W 1/2\" Uso Profesional",
-        "precio_gtq": "365.00",
-        "url": "https://www.novex.com.gt/catalogo/16655/taladro_rotomartillo_truper_650w_1_2.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/16655.jpg",
-        "keywords": ("taladro", "truper", "rotomartillo", "barreno", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Percutor Stanley SDH700 700W 1/2\" Velocidad Variable",
-        "precio_gtq": "545.00",
-        "url": "https://www.novex.com.gt/catalogo/27901/taladro_percutor_stanley_sdh700_700w.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/27901.jpg",
-        "keywords": ("taladro", "stanley", "sdh700", "percutor", "herramienta"),
-    },
-    {
-        "titulo": "Esmeriladora Angular DeWalt DWE4020 4-1/2\" 800W 12,000 RPM",
-        "precio_gtq": "625.00",
-        "url": "https://www.novex.com.gt/catalogo/25104/esmeriladora_angular_dewalt_dwe4020_800w.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/25104.jpg",
-        "keywords": ("esmeriladora", "pulidora", "dewalt", "dwe4020", "herramienta"),
-    },
-    {
-        "titulo": "Hidrolavadora Eléctrica Kärcher K2 Universal 1600 PSI Alta Presión",
-        "precio_gtq": "949.00",
-        "url": "https://www.novex.com.gt/catalogo/31209/hidrolavadora_karcher_k2_1600_psi.html",
-        "imagen_url": "https://www.novex.com.gt/images/items/large/31209.jpg",
-        "keywords": ("hidrolavadora", "karcher", "hogar", "herramienta", "jardin"),
-    },
-)
 
 
 class NovexScraper(BaseScraper):
     """
     Scraper asíncrono para Novex Guatemala (`https://www.novex.com.gt`).
-    Implementa cabeceras limpias de navegador real, extracción de JSON-LD / tarjetas HTML
-    y respaldo del catálogo verificado de Novex GT cuando Cloudflare WAF bloquea la IP.
+    Implementa cabeceras limpias de navegador real y extracción de JSON-LD / tarjetas HTML
+    sin catálogos estáticos inventados (v5.5).
     """
 
     BASE_URL = "https://www.novex.com.gt"
@@ -125,7 +69,7 @@ class NovexScraper(BaseScraper):
     def _absolutizar_url(self, href: str) -> str:
         limpio = (href or "").strip()
         if not limpio:
-            return self.BASE_URL
+            return ""
         if limpio.startswith("//"):
             return f"https:{limpio}"
         if limpio.startswith("http://") or limpio.startswith("https://"):
@@ -175,7 +119,12 @@ class NovexScraper(BaseScraper):
                     if isinstance(img, list) and img:
                         img = img[0]
                     imagen_url = self._absolutizar_url(str(img or "")) if img else ""
-                    if nombre and precio and url not in urls_vistas:
+                    if (
+                        nombre
+                        and precio
+                        and es_url_producto_directa_valida(url)
+                        and url not in urls_vistas
+                    ):
                         urls_vistas.add(url)
                         ofertas.append(
                             OfertaLocal(
@@ -211,7 +160,7 @@ class NovexScraper(BaseScraper):
                 continue
 
             url = self._absolutizar_url(href)
-            if url in urls_vistas:
+            if not es_url_producto_directa_valida(url) or url in urls_vistas:
                 continue
             urls_vistas.add(url)
 
@@ -232,44 +181,6 @@ class NovexScraper(BaseScraper):
                 )
             )
 
-        return ofertas
-
-    def buscar_en_catalogo_verificado(self, termino: str) -> list[OfertaLocal]:
-        """
-        Busca en el catálogo verificado de Novex Guatemala cuando Cloudflare WAF bloquea la petición.
-        """
-        q_lower = (termino or "").strip().lower()
-        if not q_lower:
-            return []
-
-        tokens = [t for t in q_lower.split() if len(t) >= 2]
-        ofertas: list[OfertaLocal] = []
-
-        for item in CATALOGO_VERIFICADO_NOVEX_GT:
-            titulo_lower = item["titulo"].lower()
-            keywords = item.get("keywords", ())
-            coincide = any(k in q_lower or q_lower in k for k in keywords) or any(
-                tok in titulo_lower for tok in tokens
-            )
-            if not coincide:
-                continue
-
-            # Si el usuario especificó un código de modelo (ej. dcd776, gsb20), filtrar por él
-            codigos_modelo = [
-                t for t in tokens if any(c.isdigit() for c in t) and any(c.isalpha() for c in t)
-            ]
-            if codigos_modelo and not all(cm in titulo_lower.replace("-", "") for cm in codigos_modelo):
-                continue
-
-            ofertas.append(
-                OfertaLocal(
-                    titulo=item["titulo"],
-                    precio_gtq=Decimal(item["precio_gtq"]),
-                    url=item["url"],
-                    imagen_url=item["imagen_url"],
-                    tienda=self.NOMBRE_TIENDA,
-                )
-            )
         return ofertas
 
     def _consultar_web_sync(self, termino: str) -> list[OfertaLocal]:
@@ -297,20 +208,17 @@ class NovexScraper(BaseScraper):
         if not termino:
             return []
 
-        ofertas_web: list[OfertaLocal] = []
         try:
             ofertas_web = await asyncio.to_thread(self._consultar_web_sync, termino)
         except Exception as error:
-            logger.info(
-                "Novex GT WAF activo (%s); sirviendo desde catálogo verificado Novex GT.",
+            logger.debug(
+                "Novex GT WAF/red (%s); retornando [].",
                 error.__class__.__name__,
             )
+            return []
 
-        if ofertas_web:
-            return ofertas_web
-
-        ofertas_catalogo = self.buscar_en_catalogo_verificado(termino)
+        ofertas_filtradas = filtrar_ofertas_relevantes(ofertas_web, termino)
         logger.info(
-            "Novex GT ('%s'): %d ofertas obtenidas.", termino, len(ofertas_catalogo)
+            "Novex GT ('%s'): %d ofertas reales obtenidas.", termino, len(ofertas_filtradas)
         )
-        return ofertas_catalogo
+        return ofertas_filtradas

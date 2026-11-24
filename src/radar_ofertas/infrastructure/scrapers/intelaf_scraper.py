@@ -34,7 +34,10 @@ from fake_useragent import UserAgent
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
-from radar_ofertas.domain.services.filtro_relevancia import filtrar_ofertas_relevantes
+from radar_ofertas.domain.services.filtro_relevancia import (
+    es_url_producto_directa_valida,
+    filtrar_ofertas_relevantes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,178 +49,12 @@ PLAYWRIGHT_TIMEOUT_MS = 12_000
 
 _PRECIO_GTQ_REGEX = re.compile(r"Q\s*([\d,]+(?:\.\d+)?)")
 
-# Catálogo verificado de productos reales en Intelaf Guatemala (intelaf.com)
-# utilizado como respaldo de alta disponibilidad cuando Cloudflare bloquea IPs de datacenter.
-CATALOGO_VERIFICADO_INTELAF: tuple[dict[str, Any], ...] = (
-    {
-        "codigo": "asus-m6500qc-oled",
-        "titulo": 'Laptop ASUS VivoBook Pro 15 OLED M6500 15.6" 2.8K 120Hz AMD Ryzen 7 16GB RAM 512GB SSD RTX 3050',
-        "precio_normal_gtq": 8799.00,
-        "precio_efectivo_gtq": 8150.00,
-        "url": "https://www.intelaf.com/buscar/?q=ASUS+VivoBook+Pro+15+OLED",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-vivopro15-oled.jpg",
-        "tags": ("laptop", "notebook", "asus", "vivobook", "vivobook pro", "oled", "ryzen", "rtx", "computo"),
-    },
-    {
-        "codigo": "len-legion5pro-i7",
-        "titulo": 'Laptop Gamer Lenovo Legion 5 Pro 16" WQXGA 165Hz Intel Core i7 16GB RAM 1TB SSD NVIDIA RTX 4060',
-        "precio_normal_gtq": 11499.00,
-        "precio_efectivo_gtq": 10695.00,
-        "url": "https://www.intelaf.com/buscar/?q=Lenovo+Legion+5+Pro",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/len-legion5pro.jpg",
-        "tags": ("laptop", "notebook", "lenovo", "legion", "gamer", "gaming", "rtx", "computo"),
-    },
-    {
-        "codigo": "can-eos-rebelt7",
-        "titulo": "Cámara Digital Canon EOS Rebel T7 DSLR 24.1MP con Lente EF-S 18-55mm IS II Wi-Fi",
-        "precio_normal_gtq": 4499.00,
-        "precio_efectivo_gtq": 4150.00,
-        "url": "https://www.intelaf.com/buscar/?q=Canon+EOS+Rebel+T7",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-t71855.jpg",
-        "tags": ("camara", "canon", "t7", "rebel", "eos", "dslr", "fotografia"),
-    },
-    {
-        "codigo": "can-eos-r100",
-        "titulo": "Cámara Mirrorless Canon EOS R100 24.1MP 4K con Lente RF-S 18-45mm STM",
-        "precio_normal_gtq": 4899.00,
-        "precio_efectivo_gtq": 4595.00,
-        "url": "https://www.intelaf.com/buscar/?q=Canon+EOS+R100",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-r100.jpg",
-        "tags": ("camara", "canon", "r100", "eos", "mirrorless", "fotografia"),
-    },
-    {
-        "codigo": "son-alpha-a6400",
-        "titulo": "Cámara Mirrorless Sony Alpha a6400 24.2MP 4K con Lente 16-50mm E-Mount",
-        "precio_normal_gtq": 8199.00,
-        "precio_efectivo_gtq": 7695.00,
-        "url": "https://www.intelaf.com/buscar/?q=Sony+Alpha+a6400",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-son-a6400.jpg",
-        "tags": ("camara", "sony", "alpha", "a6400", "mirrorless", "fotografia"),
-    },
-    {
-        "codigo": "asus-ux3405ca",
-        "titulo": 'Notebook ASUS Zenbook UX3405CA-SU980W Intel Core Ultra 9 285 32GB RAM 1TB SSD M.2 OLED Touch 14" Windows 11',
-        "precio_normal_gtq": 19409.00,
-        "precio_efectivo_gtq": 17798.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/asus-ux3405ca",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/asus-ux3405ca.jpg",
-        "tags": ("laptop", "notebook", "asus", "zenbook", "intel", "core", "ssd", "oled", "computo", "pc"),
-    },
-    {
-        "codigo": "msi-cr18hxia012",
-        "titulo": 'Notebook Gamer MSI Crosshair 18 HX IA Intel Core Ultra 9 275HX 32GB DDR5 1TB SSD RTX 5070 8GB 18"',
-        "precio_normal_gtq": 21999.00,
-        "precio_efectivo_gtq": 19895.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/msi-cr18hxia012",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/msi-cr18hxia012.jpg",
-        "tags": ("laptop", "notebook", "msi", "gamer", "gaming", "rtx", "gpu", "intel", "workstation", "computo", "pc"),
-    },
-    {
-        "codigo": "asus-e1504fa-bq4315w",
-        "titulo": 'Notebook ASUS VivoBook Go E1504FA-BQ4315W AMD Ryzen 5 8GB LPDDR5 512GB SSD M.2 15.6" Windows 11 Negro',
-        "precio_normal_gtq": 7177.00,
-        "precio_efectivo_gtq": 5299.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/asus-e1504fa-bq4315w",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/asus-e1504fa-bq4315w.jpg",
-        "tags": ("laptop", "notebook", "asus", "vivobook", "ryzen", "amd", "ssd", "computo", "pc"),
-    },
-    {
-        "codigo": "asus-e1504ta-bq027w",
-        "titulo": 'Notebook ASUS VivoBook Go E1504TA-BQ027W Intel N150 8GB LPDDR5 128GB SSD M.2 15.6" Windows 11',
-        "precio_normal_gtq": 4452.00,
-        "precio_efectivo_gtq": 3999.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/asus-e1504ta-bq027w",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/asus-e1504ta-bq027w.jpg",
-        "tags": ("laptop", "notebook", "asus", "vivobook", "intel", "ssd", "computo", "pc"),
-    },
-    {
-        "codigo": "hp-15-fd0095la",
-        "titulo": 'Notebook HP 15-fd0095la Intel Core i5-1334U 16GB RAM 512GB SSD NVMe Pantalla 15.6" FHD Windows 11',
-        "precio_normal_gtq": 6199.00,
-        "precio_efectivo_gtq": 5495.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/hp-15-fd0095la",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/hp-15-fd0095la.jpg",
-        "tags": ("laptop", "notebook", "hp", "intel", "core i5", "ssd", "computo", "pc"),
-    },
-    {
-        "codigo": "dell-lat-3540-i7",
-        "titulo": 'Notebook Dell Latitude 3540 Intel Core i7-1355U 16GB RAM 512GB SSD M.2 15.6" FHD Windows 11 Pro',
-        "precio_normal_gtq": 9499.00,
-        "precio_efectivo_gtq": 8695.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/dell-lat-3540-i7",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/dell-lat-3540-i7.jpg",
-        "tags": ("laptop", "notebook", "dell", "latitude", "intel", "core i7", "workstation", "computo", "pc"),
-    },
-    {
-        "codigo": "len-ideapad-s3-r7",
-        "titulo": 'Notebook Lenovo IdeaPad Slim 3 AMD Ryzen 7 7730U 16GB RAM 512GB SSD NVMe 15.6" FHD Azul',
-        "precio_normal_gtq": 6499.00,
-        "precio_efectivo_gtq": 5799.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/len-ideapad-s3-r7",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/len-ideapad-s3-r7.jpg",
-        "tags": ("laptop", "notebook", "lenovo", "ideapad", "ryzen", "amd", "ssd", "computo", "pc"),
-    },
-    {
-        "codigo": "mon-sam-ls27cg552",
-        "titulo": 'Monitor Curvo Gamer Samsung Odyssey G5 27" QHD 165Hz 1ms FreeSync LS27CG552ENXZA',
-        "precio_normal_gtq": 2499.00,
-        "precio_efectivo_gtq": 2195.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/mon-sam-ls27cg552",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/mon-sam-ls27cg552.jpg",
-        "tags": ("monitor", "pantalla", "samsung", "odyssey", "gamer", "gaming", "computo", "pc"),
-    },
-    {
-        "codigo": "mon-lg-27gs60f",
-        "titulo": 'Monitor Gamer LG UltraGear 27GS60F-B 27" IPS Full HD 180Hz 1ms HDR10 NVIDIA G-SYNC',
-        "precio_normal_gtq": 1899.00,
-        "precio_efectivo_gtq": 1650.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/mon-lg-27gs60f",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/mon-lg-27gs60f.jpg",
-        "tags": ("monitor", "pantalla", "lg", "ultragear", "gamer", "gaming", "computo", "pc"),
-    },
-    {
-        "codigo": "log-g29-ps5",
-        "titulo": "Volante de Carreras Logitech G29 Driving Force con Pedales para PS5, PS4 y PC",
-        "precio_normal_gtq": 2895.00,
-        "precio_efectivo_gtq": 2599.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/log-g29-ps5",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/log-g29-ps5.jpg",
-        "tags": ("volante", "logitech", "g29", "gamer", "gaming", "ps5", "computo", "pc"),
-    },
-    {
-        "codigo": "ps5-cnslds1tbu2",
-        "titulo": "Consola PlayStation 5 Slim 1TB Edición de Disco Blu-Ray con Control DualSense",
-        "precio_normal_gtq": 5199.00,
-        "precio_efectivo_gtq": 4695.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/ps5-cnslds1tbu2",
-        "imagen_url": "https://www.intelaf.com/images/productos/img_adicionales/ps5-cnslds1tbu2/ps5-cnslds1tbu2_1012251019070030_preview..webp",
-        "tags": ("ps5", "playstation", "consola", "sony", "gamer", "gaming"),
-    },
-    {
-        "codigo": "cel-sam-a56-256",
-        "titulo": 'Celular Samsung Galaxy A56 5G 8GB RAM 256GB Pantalla Super AMOLED 6.7" 120Hz Liberado',
-        "precio_normal_gtq": 3899.00,
-        "precio_efectivo_gtq": 3495.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/cel-sam-a56-256",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cel-sam-a56-256.jpg",
-        "tags": ("samsung", "galaxy", "celular", "telefono", "smartphone"),
-    },
-    {
-        "codigo": "cel-xi-rn14pro-256",
-        "titulo": 'Celular Xiaomi Redmi Note 14 Pro 5G 8GB RAM 256GB Cámara 200MP Pantalla AMOLED 6.67" Negro',
-        "precio_normal_gtq": 2999.00,
-        "precio_efectivo_gtq": 2695.00,
-        "url": "https://www.intelaf.com/precios_stock_detallado/cel-xi-rn14pro-256",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cel-xi-rn14pro-256.jpg",
-        "tags": ("xiaomi", "redmi", "celular", "telefono", "smartphone"),
-    },
-)
-
 
 class IntelafScraper(BaseScraper):
     """
     Scraper para extraer ofertas de Intelaf Guatemala (`intelaf.com`),
     referente local en hardware, laptops, componentes de PC y periféricos.
+    Tolerancia cero a datos sintéticos (v5.5): solo devuelve productos extraídos en vivo.
     """
 
     def __init__(
@@ -225,13 +62,13 @@ class IntelafScraper(BaseScraper):
         headless: bool = True,
         timeout_s: int = REQUEST_TIMEOUT_SECONDS,
         usar_playwright_fallback: bool = False,
-        usar_catalogo_respaldo: bool = True,
+        usar_catalogo_respaldo: bool = False,
         aplicar_filtro_ruido: bool = True,
     ) -> None:
         self._headless = headless
         self._timeout_s = timeout_s
         self._usar_playwright_fallback = usar_playwright_fallback
-        self._usar_catalogo_respaldo = usar_catalogo_respaldo
+        self._usar_catalogo_respaldo = False
         self._aplicar_filtro_ruido = aplicar_filtro_ruido
         try:
             self._user_agent = UserAgent(
@@ -449,26 +286,6 @@ class IntelafScraper(BaseScraper):
 
         return ofertas
 
-    @classmethod
-    def buscar_en_catalogo_verificado(cls, query: str) -> list[OfertaLocal]:
-        """
-        Filtra el catálogo verificado de Intelaf Guatemala según los tokens de `query`.
-        Permite responder con datos reales de Intelaf cuando Cloudflare bloquea IPs cloud.
-        """
-        tokens = [t.strip().lower() for t in query.strip().split() if t.strip()]
-        if not tokens:
-            return []
-
-        coincidencias: list[dict[str, Any]] = []
-        for item in CATALOGO_VERIFICADO_INTELAF:
-            texto_buscable = (
-                f"{item['titulo']} {' '.join(item.get('tags', ()))} {item['codigo']}"
-            ).lower()
-            if any(tok in texto_buscable for tok in tokens):
-                coincidencias.append(item)
-
-        return cls.parsear_json_productos(coincidencias)
-
     def _intentar_http_sincrono(self, url_busqueda: str) -> list[OfertaLocal]:
         headers = {
             "User-Agent": self._get_random_user_agent(),
@@ -490,8 +307,8 @@ class IntelafScraper(BaseScraper):
             return []
 
     async def buscar_producto(self, query: str) -> list[OfertaLocal]:
-        """Busca `query` en Intelaf Guatemala y retorna ofertas en Quetzales (GTQ)."""
-        termino = query.strip()
+        """Busca `query` en Intelaf Guatemala y retorna únicamente ofertas reales en Quetzales (o [] si falla)."""
+        termino = (query or "").strip()
         if not termino:
             return []
 
@@ -500,14 +317,10 @@ class IntelafScraper(BaseScraper):
         logger.info("Intelaf GT: consultando '%s'...", url_busqueda)
 
         ofertas = await asyncio.to_thread(self._intentar_http_sincrono, url_busqueda)
-
-        if not ofertas and self._usar_catalogo_respaldo:
-            ofertas = self.buscar_en_catalogo_verificado(termino)
-            if ofertas:
-                logger.info(
-                    "Intelaf GT: %d ofertas obtenidas desde catálogo verificado de respaldo.",
-                    len(ofertas),
-                )
+        ofertas = [
+            o for o in ofertas
+            if es_url_producto_directa_valida(o.url)
+        ]
 
         if self._aplicar_filtro_ruido and ofertas:
             ofertas = filtrar_ofertas_relevantes(ofertas, termino)

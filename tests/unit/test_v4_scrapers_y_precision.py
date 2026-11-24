@@ -77,7 +77,7 @@ def test_epa_scraper_parsea_graphql_magento() -> None:
     assert ofertas[0].url == "https://gt.epaenlinea.com/0835558-taladro-percutor-bosch-gsb20-2.html"
 
 
-def test_novex_scraper_parsea_html_y_catalogo_verificado() -> None:
+def test_novex_scraper_parsea_html_real() -> None:
     scraper = NovexScraper()
     html = """
     <div class="product-item">
@@ -90,10 +90,7 @@ def test_novex_scraper_parsea_html_y_catalogo_verificado() -> None:
     assert len(ofertas_html) == 1
     assert ofertas_html[0].tienda == "Novex"
     assert ofertas_html[0].precio_gtq == Decimal("1395.00")
-
-    ofertas_cat = scraper.buscar_en_catalogo_verificado("Taladro DeWalt DCD776")
-    assert len(ofertas_cat) >= 1
-    assert all("dcd776" in o.titulo.lower() for o in ofertas_cat)
+    assert ofertas_html[0].url == "https://www.novex.com.gt/catalogo/29140/taladro_dewalt_dcd776.html"
 
 
 def test_motor_precision_modelos_evita_comparacion_dispareja() -> None:

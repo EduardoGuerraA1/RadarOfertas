@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>tecHunter GT v5.4 — El mejor precio. Ya calculado con envío.</title>
+  <title>tecHunter GT v5.5 — El mejor precio. Ya calculado con envío.</title>
   {% if ga_measurement_id %}
   <!-- Google Analytics 4 (GA4) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
@@ -17,14 +17,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
-  <!-- CSS Estático y Minificado v5.4 (Cero compilación Tailwind CDN en runtime) -->
-  <link rel="stylesheet" href="/static/styles.css?v=5.4.0" />
+  <!-- CSS Estático y Minificado v5.5 (Cero compilación Tailwind CDN en runtime) -->
+  <link rel="stylesheet" href="/static/styles.css?v=5.5.0" />
   <!-- Iconos secundarios con defer (los iconos críticos above-the-fold son SVGs inline ultraligeros) -->
   <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body class="min-h-screen flex flex-col">
 
-  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.4 App Shell) -->
+  <!-- Top Navigation Bar (Estilo Apple / Quiet Luxury Modo Claro — v5.5 App Shell) -->
   <header class="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-gray-200/80">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       <!-- Brand -->
@@ -38,7 +38,7 @@
         </div>
         <div class="flex items-baseline gap-1.5">
           <span class="text-base font-bold tracking-tight text-gray-950">tec<span class="text-emerald-600">Hunter</span></span>
-          <span class="text-xs font-medium text-gray-400">GT v5.4</span>
+          <span class="text-xs font-medium text-gray-400">GT v5.5</span>
         </div>
       </a>
 
@@ -285,7 +285,7 @@
         </div>
       </div>
 
-      <!-- Store Filter Pills with Live Stock Counters (25 Tiendas en v5.4) -->
+      <!-- Store Filter Pills with Live Stock Counters (25 Tiendas en v5.5) -->
       {% set filtros_tienda = [
         ('guatemaladigital', 'Guatemala Digital', resumen.total_guatemaladigital | default(0), 'bg-emerald-600'),
         ('rech', 'Rech', resumen.total_rech | default(0), 'bg-purple-600'),
@@ -496,11 +496,11 @@
         </a>
       </section>
 
-      <!-- Roadmap Banner: 25 Tiendas Activas en v5.4 -->
+      <!-- Roadmap Banner: 25 Tiendas Activas en v5.5 -->
       {% if siguientes_tiendas %}
       <div class="mt-6 rounded-2xl border border-gray-200/80 bg-white px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-500">
         <div class="flex items-center gap-2">
-          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Especialistas v5.4</span>
+          <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70 font-semibold">Especialistas v5.5</span>
           <span>25 tiendas activas en Neon DB (incorporando Guatemala Digital, Rech, Click Guatemala y Tera · sync 3x/día) · Siguientes en cola:</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -514,7 +514,7 @@
       </div>
       {% endif %}
 
-      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente — v5.4) -->
+      <!-- Sección de Preguntas Frecuentes (FAQ Amigable y Transparente — v5.5) -->
       <section id="faq" class="mt-14 pt-10 border-t border-gray-200/80">
         <div class="max-w-4xl mx-auto">
           <div class="text-center mb-8">
@@ -609,7 +609,7 @@
   <footer class="border-t border-gray-200/80 bg-white py-6 px-4 sm:px-6 lg:px-8">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-400">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.4</span>
+        <span class="font-bold text-gray-900">tec<span class="text-emerald-600">Hunter</span> GT v5.5</span>
         <span>·</span>
         <span>Comparador Gratuito de Precios en Guatemala · 25 Tiendas en Neon DB</span>
       </div>

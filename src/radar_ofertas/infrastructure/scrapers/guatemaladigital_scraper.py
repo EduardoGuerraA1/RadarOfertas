@@ -1,20 +1,22 @@
 """
-Scraper Funcional para Guatemala Digital (guatemaladigital.com — Tecnología, Fotografía, Laptops OLED e Importación Local).
+Scraper Real para Guatemala Digital (guatemaladigital.com — Tecnología, Fotografía, Laptops e Importación Local).
 
-Implementación v5.4:
-  - Consulta el buscador oficial `https://guatemaladigital.com/Busqueda?Busqueda=<termino>`
-    utilizando cabeceras HTTP realistas para Guatemala (`Accept-Language: es-GT,es;q=0.9`, User-Agent moderno).
-  - Parsea respuestas HTML/JSON y cuenta con respaldo en catálogo verificado de alta demanda
-    para cámaras fotográficas (Canon EOS Rebel T7, Canon EOS R100, Sony Alpha a6400, Nikon D3500),
-    ecosistema Sony, laptops profesionales/gaming (ASUS VivoBook Pro 15 OLED, ASUS Zenbook 14 OLED,
-    Lenovo Legion 5 Pro) y periféricos en Quetzales (GTQ).
-  - Garantiza que todas las URLs salientes pasen por `resolver_url_saliente_segura` para evitar errores 404.
+Implementación v5.5 (Tolerancia Cero a Datos Sintéticos):
+  - Sin listas estáticas (`CATALOGO_VERIFICADO_*` eliminado por completo).
+  - Consulta en tiempo real la API oficial `https://webapi.guatemaladigital.click/api/Busqueda`
+    y el HTML de `https://guatemaladigital.com`.
+  - Extrae exclusivamente el título real (`Descripcion`), precio real en Quetzales (`Precio`),
+    imagen real (`Foto`) y la URL directa real del producto (`https://guatemaladigital.com/Producto/<CodigoProducto>`).
+  - Si la tienda no responde o no tiene el producto, devuelve `[]`.
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
+import ssl
+import urllib.parse
 import urllib.request
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -24,8 +26,8 @@ from bs4 import BeautifulSoup
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
 from radar_ofertas.domain.services.filtro_relevancia import (
-    construir_url_busqueda_tienda,
     es_oferta_relevante,
+    es_url_producto_directa_valida,
     resolver_url_saliente_segura,
 )
 
@@ -36,131 +38,21 @@ HEADERS_REALISTAS_GT: dict[str, str] = {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept": "application/json,text/html,application/xhtml+xml,*/*;q=0.8",
     "Accept-Language": "es-GT,es;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Cache-Control": "no-cache",
+    "Origin": "https://guatemaladigital.com",
+    "Referer": "https://guatemaladigital.com/",
 }
-
-CATALOGO_VERIFICADO_GUATEMALADIGITAL_GT: tuple[dict[str, Any], ...] = (
-    # Fotografía y Video Profesional (Canon, Sony, Nikon)
-    {
-        "titulo": "Cámara Digital Canon EOS Rebel T7 DSLR 24.1MP con Lente EF-S 18-55mm IS II Wi-Fi",
-        "precio_gtq": "4195.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Canon+EOS+Rebel+T7+18-55mm",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-t71855.jpg",
-        "keywords": ("canon", "t7", "canon t7", "rebel t7", "eos rebel t7", "camara canon"),
-    },
-    {
-        "titulo": "Cámara Mirrorless Canon EOS R100 24.1MP 4K con Lente RF-S 18-45mm STM",
-        "precio_gtq": "4650.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Canon+EOS+R100+18-45mm",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-can-r100.jpg",
-        "keywords": ("canon", "r100", "canon r100", "eos r100", "mirrorless"),
-    },
-    {
-        "titulo": "Cámara Mirrorless Sony Alpha a6400 24.2MP 4K con Lente 16-50mm E-Mount",
-        "precio_gtq": "7850.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Sony+Alpha+a6400+16-50mm",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-son-a6400.jpg",
-        "keywords": ("sony", "a6400", "alpha a6400", "sony alpha", "camara sony"),
-    },
-    {
-        "titulo": "Cámara DSLR Nikon D3500 24.2MP Full HD con Lente AF-P DX NIKKOR 18-55mm VR",
-        "precio_gtq": "4890.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Nikon+D3500+18-55mm",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-nik-d3500.jpg",
-        "keywords": ("nikon", "d3500", "nikon d3500", "camara nikon"),
-    },
-    {
-        "titulo": "Audífonos Inalámbricos Sony WH-1000XM5 Noise Cancelling Bluetooth 30h Negro",
-        "precio_gtq": "2795.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Sony+WH-1000XM5",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/aud-son-wh1000xm5.jpg",
-        "keywords": ("sony", "wh-1000xm5", "audifonos sony", "diadema sony"),
-    },
-    {
-        "titulo": "Consola Sony PlayStation 5 Slim 1TB Edición Digital 4K HDR",
-        "precio_gtq": "4295.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Sony+PlayStation+5+Slim+1TB",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/con-son-ps5slim.jpg",
-        "keywords": ("sony", "ps5", "playstation 5", "consola sony"),
-    },
-    # Laptops Pro / OLED y Gaming
-    {
-        "titulo": 'Laptop ASUS VivoBook Pro 15 OLED M6500 15.6" 2.8K 120Hz AMD Ryzen 7 16GB RAM 512GB SSD RTX 3050',
-        "precio_gtq": "8295.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=ASUS+VivoBook+Pro+15+OLED",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-vivopro15-oled.jpg",
-        "keywords": (
-            "asus",
-            "vivobook",
-            "vivobook pro",
-            "vivobook pro 15",
-            "oled",
-            "asus vivobook pro 15 oled",
-        ),
-    },
-    {
-        "titulo": 'Laptop ASUS Zenbook 14 OLED UX3405 14" 3K Touch Intel Core Ultra 7 16GB RAM 1TB SSD',
-        "precio_gtq": "9495.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=ASUS+Zenbook+14+OLED",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/asu-zen14-oled.jpg",
-        "keywords": ("asus", "zenbook", "zenbook oled", "asus zenbook oled", "oled"),
-    },
-    {
-        "titulo": 'Laptop Gamer Lenovo Legion 5 Pro 16" WQXGA 165Hz Intel Core i7 16GB RAM 1TB SSD NVIDIA RTX 4060',
-        "precio_gtq": "10850.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Lenovo+Legion+5+Pro+RTX+4060",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/len-legion5pro.jpg",
-        "keywords": ("lenovo", "legion", "lenovo legion", "legion 5", "rtx 4060"),
-    },
-    # Periféricos y Smart Home
-    {
-        "titulo": "Mousepad Gamer Razer Gigantus V2 Large Micro-Weave Cloth 450x400mm",
-        "precio_gtq": "179.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=Mousepad+Razer+Gigantus+V2+Large",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/mpad-raz-gigv2l.jpg",
-        "keywords": ("mousepad", "razer", "gigantus", "v2", "large"),
-    },
-    {
-        "titulo": "Cámara de Seguridad Wi-Fi TP-Link Tapo C200 360° Full HD 1080p Visión Nocturna",
-        "precio_gtq": "259.00",
-        "url": "https://guatemaladigital.com/Busqueda?Busqueda=TP-Link+Tapo+C200",
-        "imagen_url": "https://www.intelaf.com/images/productos/gran/cam-tpl-tapoc200.jpg",
-        "keywords": ("camara de seguridad", "tp-link", "tapo", "c200", "tapo c200"),
-    },
-)
-
-STOPWORDS_CATALOGO: frozenset[str] = frozenset(
-    {
-        "de",
-        "la",
-        "el",
-        "en",
-        "con",
-        "para",
-        "por",
-        "del",
-        "los",
-        "las",
-        "gamer",
-        "gaming",
-        "full",
-        "hd",
-        "wifi",
-        "wi-fi",
-        "digital",
-    }
-)
 
 
 class GuatemalaDigitalScraper(BaseScraper):
     """
-    Scraper asíncrono funcional para Guatemala Digital (`https://guatemaladigital.com`).
-    Cubre tecnología, fotografía (Canon, Sony, Nikon), laptops Pro/OLED e importación local.
+    Scraper asíncrono 100% real para Guatemala Digital (`https://guatemaladigital.com`).
+    Sin catálogos estáticos: devuelve únicamente productos reales con URL directa verificada.
     """
 
     BASE_URL = "https://guatemaladigital.com"
+    API_BUSQUEDA_URL = "https://webapi.guatemaladigital.click/api/Busqueda"
     NOMBRE_TIENDA = "Guatemala Digital"
 
     def __init__(
@@ -170,21 +62,13 @@ class GuatemalaDigitalScraper(BaseScraper):
         self.habilitado = habilitado
         self.simular = simular
 
-    @classmethod
-    def construir_url_busqueda(cls, termino: str) -> str:
-        """Construye la URL oficial de búsqueda en Guatemala Digital (`https://guatemaladigital.com/Busqueda?Busqueda=...`)."""
-        return construir_url_busqueda_tienda("guatemaladigital", termino)
-
-    @classmethod
-    def asegurar_url_valida(cls, url: str, titulo: str) -> str:
-        """Garantiza que ninguna oferta de Guatemala Digital apunte a una página 404/500 rota."""
-        return resolver_url_saliente_segura(url, "guatemaladigital", titulo)
-
     @staticmethod
     def _limpiar_precio(valor: Any) -> Decimal | None:
         if valor is None:
             return None
         texto = str(valor).strip()
+        if not texto or texto.lower() in {"ver precio", "comprar", "gratis", "0"}:
+            return None
         limpio = re.sub(r"[^\d.,]", "", texto)
         if not limpio:
             return None
@@ -195,8 +79,88 @@ class GuatemalaDigitalScraper(BaseScraper):
         except InvalidOperation:
             return None
 
+    @classmethod
+    def _construir_url_producto_directa(cls, item: dict[str, Any]) -> str:
+        """
+        Construye la URL directa real de ficha de producto en Guatemala Digital:
+          - `https://guatemaladigital.com/Producto/<CodigoProducto>`
+          - o `https://guatemaladigital.com/ProductoP/<CodigoAmazon>` si `CodigoProducto == 0`.
+        """
+        codigo_prod = item.get("CodigoProducto")
+        try:
+            cod_int = int(codigo_prod or 0)
+        except (ValueError, TypeError):
+            cod_int = 0
+
+        if cod_int > 0:
+            return f"{cls.BASE_URL}/Producto/{cod_int}"
+
+        codigo_amz = str(item.get("CodigoAmazon") or "").strip()
+        if codigo_amz:
+            return f"{cls.BASE_URL}/ProductoP/{codigo_amz}"
+
+        link_raw = str(item.get("Link") or item.get("url") or "").strip()
+        if link_raw:
+            url_abs = (
+                link_raw
+                if link_raw.startswith("http")
+                else f"{cls.BASE_URL}/{link_raw.lstrip('/')}"
+            )
+            return resolver_url_saliente_segura(url_abs)
+        return ""
+
+    def parsear_respuesta_api(self, payload: dict[str, Any] | list[Any]) -> list[OfertaLocal]:
+        """
+        Extrae entidades `OfertaLocal` reales desde el JSON oficial de `webapi.guatemaladigital.click/api/Busqueda`.
+        """
+        articulos: list[dict[str, Any]] = []
+        if isinstance(payload, dict):
+            resp_list = payload.get("Response")
+            if isinstance(resp_list, list) and resp_list:
+                primero = resp_list[0]
+                if isinstance(primero, dict) and isinstance(primero.get("Articulos"), list):
+                    articulos = primero["Articulos"]
+                else:
+                    articulos = [x for x in resp_list if isinstance(x, dict)]
+            elif isinstance(payload.get("Articulos"), list):
+                articulos = payload["Articulos"]
+        elif isinstance(payload, list):
+            articulos = [x for x in payload if isinstance(x, dict)]
+
+        ofertas: list[OfertaLocal] = []
+        urls_vistas: set[str] = set()
+
+        for item in articulos:
+            if not isinstance(item, dict):
+                continue
+            titulo = str(item.get("Descripcion") or item.get("name") or item.get("title") or "").strip()
+            precio = self._limpiar_precio(item.get("Precio") or item.get("price"))
+            url_directa = self._construir_url_producto_directa(item)
+            imagen_url = resolver_url_saliente_segura(
+                str(item.get("Foto") or item.get("image") or "").strip()
+            )
+
+            if not titulo or precio is None or not es_url_producto_directa_valida(url_directa):
+                continue
+            if not imagen_url or not imagen_url.startswith("https://"):
+                continue
+            if url_directa in urls_vistas:
+                continue
+            urls_vistas.add(url_directa)
+
+            ofertas.append(
+                OfertaLocal(
+                    titulo=titulo,
+                    precio_gtq=precio,
+                    url=url_directa,
+                    imagen_url=imagen_url,
+                    tienda=self.NOMBRE_TIENDA,
+                )
+            )
+        return ofertas
+
     def parsear_html(self, html: str) -> list[OfertaLocal]:
-        """Extrae tarjetas de productos desde el HTML de búsqueda de Guatemala Digital."""
+        """Extrae tarjetas de productos reales con URL directa desde HTML de Guatemala Digital."""
         if not html or not html.strip():
             return []
         soup = BeautifulSoup(html, "html.parser")
@@ -204,118 +168,85 @@ class GuatemalaDigitalScraper(BaseScraper):
         urls_vistas: set[str] = set()
 
         for card in soup.select(
-            ".product-card, .product-item, .card-producto, .item-producto, .product, article"
+            ".bloque--busqueda--item-PB, .product-card, .product-item, .card-producto, article"
         ):
-            enlace = card.select_one("a[href*='Producto'], a[href*='producto'], h2 a, h3 a, .product-title a, a")
+            enlace = card.select_one("a[href*='/Producto/'], a[href*='/ProductoP/'], a[href]")
             nodo_precio = card.select_one(
-                ".price, .product-price, .precio, .amount, span[class*='price'], span[class*='precio']"
+                ".Rectangle_8_PB, .price, .product-price, .precio, .amount"
             )
             if not enlace or not nodo_precio:
                 continue
-            titulo = enlace.get_text(" ", strip=True) or str(enlace.get("title") or "").strip()
+            titulo = (
+                enlace.get_text(" ", strip=True)
+                or str(enlace.get("title") or "").strip()
+            )
             href = str(enlace.get("href") or "").strip()
             precio = self._limpiar_precio(nodo_precio.get_text(" ", strip=True))
-            if not titulo or len(titulo) < 5 or precio is None:
+            if not titulo or len(titulo) < 5 or not href or precio is None:
                 continue
-            url_abs = (
-                href
-                if href.startswith("http")
-                else f"{self.BASE_URL}/{href.lstrip('/')}"
-                if href
-                else ""
+            url_abs = resolver_url_saliente_segura(
+                href if href.startswith("http") else f"{self.BASE_URL}/{href.lstrip('/')}"
             )
-            url_segura = self.asegurar_url_valida(url_abs, titulo)
-            if url_segura in urls_vistas:
+            if not es_url_producto_directa_valida(url_abs) or url_abs in urls_vistas:
                 continue
-            urls_vistas.add(url_segura)
 
             img_el = card.select_one("img")
             img_url = (
-                str(img_el.get("data-src") or img_el.get("src") or "").strip()
+                resolver_url_saliente_segura(
+                    str(img_el.get("data-src") or img_el.get("src") or "").strip()
+                )
                 if img_el
-                else None
+                else ""
             )
+            if not img_url.startswith("https://"):
+                continue
 
+            urls_vistas.add(url_abs)
             ofertas.append(
                 OfertaLocal(
                     titulo=titulo,
                     precio_gtq=precio,
-                    url=url_segura,
+                    url=url_abs,
                     imagen_url=img_url,
                     tienda=self.NOMBRE_TIENDA,
                 )
             )
         return ofertas
 
-    def buscar_en_catalogo_verificado(self, termino: str) -> list[OfertaLocal]:
-        q_lower = (termino or "").strip().lower()
-        if not q_lower:
-            return []
-        tokens_especificos = [
-            t for t in q_lower.split() if len(t) >= 2 and t not in STOPWORDS_CATALOGO
-        ]
-        if not tokens_especificos:
-            tokens_especificos = [t for t in q_lower.split() if len(t) >= 2]
-        es_multi_query_general = len(tokens_especificos) >= 6
-        ofertas: list[OfertaLocal] = []
-
-        for item in CATALOGO_VERIFICADO_GUATEMALADIGITAL_GT:
-            titulo = item["titulo"]
-            titulo_lower = titulo.lower()
-            keywords = item.get("keywords", ())
-            coincide = any(tok in titulo_lower for tok in tokens_especificos) or any(
-                k in q_lower for k in keywords
-            )
-            if not coincide:
-                continue
-            if not es_multi_query_general and not es_oferta_relevante(titulo, termino):
-                continue
-
-            ofertas.append(
-                OfertaLocal(
-                    titulo=titulo,
-                    precio_gtq=Decimal(item["precio_gtq"]),
-                    url=self.asegurar_url_valida(item["url"], titulo),
-                    imagen_url=item["imagen_url"],
-                    tienda=self.NOMBRE_TIENDA,
-                )
-            )
-        return ofertas
-
-    def _consultar_web_sync(self, termino: str) -> list[OfertaLocal]:
-        url = self.construir_url_busqueda(termino)
+    def _consultar_api_sync(self, termino: str) -> list[OfertaLocal]:
+        q_enc = urllib.parse.quote(termino.strip())
+        url = f"{self.API_BUSQUEDA_URL}?CadenaBusqueda={q_enc}&NumeroPagina=1&Traduccion={q_enc}"
         req = urllib.request.Request(url, headers=HEADERS_REALISTAS_GT)
-        with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
-        return self.parsear_html(html)
+        ctx = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=self.timeout_s, context=ctx) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore")
+        payload = json.loads(raw)
+        return self.parsear_respuesta_api(payload)
 
     async def buscar_producto(self, termino_busqueda: str) -> list[OfertaLocal]:
         termino = (termino_busqueda or "").strip()
-        if not termino or not self.habilitado:
+        if not termino or not self.habilitado or self.simular:
             return []
 
-        ofertas_web: list[OfertaLocal] = []
-        if not self.simular:
-            try:
-                ofertas_web = await asyncio.to_thread(self._consultar_web_sync, termino)
-            except Exception as exc:
-                logger.debug(
-                    "Guatemala Digital web fallback (%s) para '%s'.",
-                    exc.__class__.__name__,
-                    termino,
-                )
+        try:
+            ofertas_api = await asyncio.to_thread(self._consultar_api_sync, termino)
+        except Exception as exc:
+            logger.debug(
+                "Guatemala Digital API sin resultados (%s) para '%s'.",
+                exc.__class__.__name__,
+                termino,
+            )
+            return []
 
-        ofertas_cat = self.buscar_en_catalogo_verificado(termino)
-        urls_vistas = {o.url for o in ofertas_web}
-        combinadas = [
-            o for o in ofertas_web if es_oferta_relevante(o.titulo, termino)
+        relevantes = [
+            o
+            for o in ofertas_api
+            if es_url_producto_directa_valida(o.url)
+            and es_oferta_relevante(o.titulo, termino)
         ]
-        for o_cat in ofertas_cat:
-            if o_cat.url not in urls_vistas:
-                combinadas.append(o_cat)
-                urls_vistas.add(o_cat.url)
-
         logger.info(
-            "Guatemala Digital ('%s'): %d ofertas extraídas.", termino, len(combinadas)
+            "Guatemala Digital ('%s'): %d ofertas reales extraídas.",
+            termino,
+            len(relevantes),
         )
-        return combinadas
+        return relevantes

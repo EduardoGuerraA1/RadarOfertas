@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
 from radar_ofertas.domain.repositories.oferta_repository import OfertaRepository
 from radar_ofertas.domain.services.filtro_relevancia import (
+    es_url_producto_directa_valida,
     extraer_especificaciones_y_gama,
     filtrar_dicts_relevantes,
     resolver_url_saliente_segura,
@@ -605,10 +606,14 @@ class PostgresOfertaRepository(OfertaRepository):
                     cache_tiendas: dict[str, tuple[str, bool, Decimal]] = {}
 
                     for oferta in ofertas:
+                        url_normalizada = resolver_url_saliente_segura(
+                            oferta.url, oferta.tienda, oferta.titulo
+                        )
                         if (
                             oferta.precio_gtq <= 0
                             or getattr(oferta, "estado_precio_membresia", "publico")
                             == "oculto_requiere_login"
+                            or not es_url_producto_directa_valida(url_normalizada)
                         ):
                             omitidos_sin_cambio += 1
                             continue
@@ -638,9 +643,7 @@ class PostgresOfertaRepository(OfertaRepository):
 
                         costo_envio = Decimal("0.00") if envio_gratis else tarifa_envio
                         costo_real_gtq = precio_nativo + costo_envio
-                        url_segura = resolver_url_saliente_segura(
-                            oferta.url, oferta.tienda, oferta.titulo
-                        )
+                        url_segura = url_normalizada
 
                         cursor.execute(
                             """
@@ -781,14 +784,16 @@ class PostgresOfertaRepository(OfertaRepository):
             if slug_tienda_str == "tecnofacil":
                 slug_tienda_str = "tecno-facil"
             precio_float = float(fila[6])
+            url_segura = resolver_url_saliente_segura(
+                str(fila[9]), slug_tienda_str, titulo_str
+            )
+            if not es_url_producto_directa_valida(url_segura):
+                continue
             cat_ui = self.clasificar_categoria_ui(titulo_str, slug_tienda_str)
             meta_modelo = extraer_especificaciones_y_gama(
                 titulo_str, precio_gtq=precio_float, categoria_ui=cat_ui
             )
             marca_str = str(fila[2] or "") or (self._inferir_marca(titulo_str) or "Oficial GT")
-            url_segura = resolver_url_saliente_segura(
-                str(fila[9]), slug_tienda_str, titulo_str
-            )
             resultados.append(
                 {
                     "producto_id": str(fila[0]),

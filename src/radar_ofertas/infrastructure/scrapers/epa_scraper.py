@@ -20,39 +20,18 @@ from bs4 import BeautifulSoup
 
 from radar_ofertas.application.use_cases.base_scraper import BaseScraper
 from radar_ofertas.domain.entities.oferta_local import OfertaLocal
+from radar_ofertas.domain.services.filtro_relevancia import (
+    es_url_producto_directa_valida,
+    filtrar_ofertas_relevantes,
+)
 
 logger = logging.getLogger(__name__)
-
-
-CATALOGO_VERIFICADO_EPA_GT: tuple[dict[str, Any], ...] = (
-    {
-        "titulo": "Taladro Percutor Inalámbrico DeWalt DCD776C2 20V Max 1/2\" con 2 Baterías",
-        "precio_gtq": "1429.00",
-        "url": "https://gt.epaenlinea.com/taladro-percutor-inalambrico-dewalt-dcd776c2-20v.html",
-        "imagen_url": "https://gt.epaenlinea.com/media/catalog/product/d/c/dcd776c2.jpg",
-        "keywords": ("taladro", "dewalt", "dcd776", "percutor", "barreno", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Percutor Industrial Bosch GSB 20-2 800W 1/2\" 2 Velocidades",
-        "precio_gtq": "1999.00",
-        "url": "https://gt.epaenlinea.com/0835558-taladro-percutor-bosch-gsb20-2.html",
-        "imagen_url": "https://gt.epaenlinea.com/media/catalog/product/0/8/0835558.jpg",
-        "keywords": ("taladro", "bosch", "gsb20", "gsb 20-2", "percutor", "herramienta"),
-    },
-    {
-        "titulo": "Taladro Rotomartillo Total Industrial 850W 1/2\" Velocidad Variable",
-        "precio_gtq": "449.00",
-        "url": "https://gt.epaenlinea.com/taladro-rotomartillo-total-850w-1-2.html",
-        "imagen_url": "https://gt.epaenlinea.com/media/catalog/product/t/o/total850w.jpg",
-        "keywords": ("taladro", "rotomartillo", "barreno", "herramienta"),
-    },
-)
 
 
 class EpaScraper(BaseScraper):
     """
     Scraper asíncrono para EPA Guatemala (`https://gt.epaenlinea.com`).
-    Utiliza GraphQL nativo de Magento 2 vía GET y fallback HTML/catálogo.
+    Utiliza GraphQL nativo de Magento 2 vía GET sin catálogos estáticos inventados (v5.5).
     """
 
     BASE_URL = "https://gt.epaenlinea.com"
@@ -112,17 +91,15 @@ class EpaScraper(BaseScraper):
                 continue
 
             url_key = str(item.get("url_key") or "").strip()
-            if url_key:
-                url = (
-                    url_key
-                    if url_key.startswith("http")
-                    else f"{self.BASE_URL}/{url_key.lstrip('/')}.html"
-                )
-            else:
-                sku = str(item.get("sku") or "").strip()
-                url = f"{self.BASE_URL}/catalogsearch/result/?q={urllib.parse.quote_plus(sku or nombre)}"
+            if not url_key:
+                continue
+            url = (
+                url_key
+                if url_key.startswith("http")
+                else f"{self.BASE_URL}/{url_key.lstrip('/')}.html"
+            )
 
-            if url in urls_vistas:
+            if not es_url_producto_directa_valida(url) or url in urls_vistas:
                 continue
             urls_vistas.add(url)
 
@@ -172,7 +149,7 @@ class EpaScraper(BaseScraper):
                 continue
 
             url = href if href.startswith("http") else urllib.parse.urljoin(self.BASE_URL, href)
-            if url in urls_vistas:
+            if not es_url_producto_directa_valida(url) or url in urls_vistas:
                 continue
             urls_vistas.add(url)
 
@@ -218,47 +195,17 @@ class EpaScraper(BaseScraper):
             payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
         return self.parsear_respuesta_graphql(payload)
 
-    def buscar_en_catalogo_verificado(self, termino: str) -> list[OfertaLocal]:
-        q_lower = (termino or "").strip().lower()
-        if not q_lower:
-            return []
-        tokens = [t for t in q_lower.split() if len(t) >= 2]
-        ofertas: list[OfertaLocal] = []
-        for item in CATALOGO_VERIFICADO_EPA_GT:
-            titulo_lower = item["titulo"].lower()
-            keywords = item.get("keywords", ())
-            if any(k in q_lower or q_lower in k for k in keywords) or any(
-                tok in titulo_lower for tok in tokens
-            ):
-                ofertas.append(
-                    OfertaLocal(
-                        titulo=item["titulo"],
-                        precio_gtq=Decimal(item["precio_gtq"]),
-                        url=item["url"],
-                        imagen_url=item["imagen_url"],
-                        tienda=self.NOMBRE_TIENDA,
-                    )
-                )
-        return ofertas
-
     async def buscar_producto(self, termino_busqueda: str) -> list[OfertaLocal]:
         termino = (termino_busqueda or "").strip()
         if not termino:
             return []
 
-        ofertas_gql: list[OfertaLocal] = []
         try:
             ofertas_gql = await asyncio.to_thread(self._consultar_graphql_sync, termino)
         except Exception as error:
-            logger.warning("EPA Guatemala GraphQL falló para '%s': %s", termino, error)
+            logger.debug("EPA Guatemala GraphQL falló para '%s': %s", termino, error)
+            return []
 
-        ofertas_cat = self.buscar_en_catalogo_verificado(termino)
-        urls_vistas = {o.url for o in ofertas_gql}
-        combinadas = list(ofertas_gql)
-        for o_cat in ofertas_cat:
-            if o_cat.url not in urls_vistas:
-                combinadas.append(o_cat)
-                urls_vistas.add(o_cat.url)
-
-        logger.info("EPA Guatemala ('%s'): %d ofertas extraídas.", termino, len(combinadas))
-        return combinadas
+        ofertas_filtradas = filtrar_ofertas_relevantes(ofertas_gql, termino)
+        logger.info("EPA Guatemala ('%s'): %d ofertas reales extraídas.", termino, len(ofertas_filtradas))
+        return ofertas_filtradas

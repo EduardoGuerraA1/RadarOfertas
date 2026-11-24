@@ -19,7 +19,7 @@ from radar_ofertas.infrastructure.scrapers.pricesmart_scraper import PriceSmartS
 from radar_ofertas.infrastructure.scrapers.tecnofacil_scraper import TecnoFacilScraper
 
 
-def test_intelaf_scraper_parsea_html_y_catalogo_verificado() -> None:
+def test_intelaf_scraper_parsea_html_y_json_real() -> None:
     html_intelaf = """
     <div class="product-card">
       <a href="/precios_stock_detallado/asus-ux3405ca">
@@ -39,14 +39,46 @@ def test_intelaf_scraper_parsea_html_y_catalogo_verificado() -> None:
         == "https://www.intelaf.com/precios_stock_detallado/asus-ux3405ca"
     )
 
-    ofertas_cat = IntelafScraper.buscar_en_catalogo_verificado("laptop")
-    assert len(ofertas_cat) >= 3
-    assert all(o.tienda == "Intelaf" and o.precio_gtq > 0 for o in ofertas_cat)
+    ofertas_json = IntelafScraper.parsear_json_productos(
+        [
+            {
+                "codigo": "asus-ux3405ca",
+                "titulo": "Notebook ASUS Zenbook UX3405CA Core Ultra 9 32GB 1TB SSD",
+                "precio_efectivo_gtq": 17798.00,
+                "url": "https://www.intelaf.com/precios_stock_detallado/asus-ux3405ca",
+                "imagen_url": "https://www.intelaf.com/images/productos/gran/asus-ux3405ca.jpg",
+            }
+        ]
+    )
+    assert len(ofertas_json) == 1
+    assert ofertas_json[0].tienda == "Intelaf"
+    assert ofertas_json[0].precio_gtq == 17798.00
 
 
-def test_tecnofacil_scraper_parsea_graphql_y_catalogo_cuotas() -> None:
-    ofertas = TecnoFacilScraper.buscar_en_catalogo_verificado("refrigeradora")
-    assert len(ofertas) >= 1
+def test_tecnofacil_scraper_parsea_graphql_real() -> None:
+    payload = {
+        "data": {
+            "products": {
+                "items": [
+                    {
+                        "name": "Refrigeradora Samsung Top Mount 14 pies RT38DG6224S9",
+                        "sku": "RT38DG6224S9",
+                        "url_key": "refrigeradora-samsung-top-mount-13-pies-con-wifi-samsung-rt38dg6224s9",
+                        "small_image": {
+                            "url": "https://www.tecnofacil.com.gt/media/catalog/product/r/t/rt38dg6224s9_1.jpg"
+                        },
+                        "price_range": {
+                            "minimum_price": {
+                                "final_price": {"value": 5295.00, "currency": "GTQ"}
+                            }
+                        },
+                    }
+                ]
+            }
+        }
+    }
+    ofertas = TecnoFacilScraper.parsear_respuesta_graphql(payload)
+    assert len(ofertas) == 1
     assert ofertas[0].tienda == "Tecno Fácil"
     assert ofertas[0].precio_gtq == 5295.00
     assert ofertas[0].url.startswith("https://www.tecnofacil.com.gt/")

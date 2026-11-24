@@ -439,44 +439,64 @@ def construir_url_busqueda_tienda(tienda_slug_o_nombre: str, termino: str) -> st
     return plantilla.format(query=q_encoded)
 
 
-def resolver_url_saliente_segura(url: str, tienda_slug_o_nombre: str, titulo: str) -> str:
+PATRONES_URL_BUSQUEDA_SINTETICA: tuple[str, ...] = (
+    "/buscar?q=",
+    "/buscar/?q=",
+    "/busqueda?q=",
+    "/busqueda?controller=search",
+    "/?s=",
+    "/search?q=",
+    "/search?query=",
+    "/catalogsearch/result",
+    "/busqueda?busqueda=",
+    "/officedepotguatemala/es/search",
+    "&map=ft",
+)
+
+
+def es_url_producto_directa_valida(url: str) -> bool:
     """
-    Verifica la URL saliente de un producto. Si la URL directa no puede verificarse con certeza
-    (ej. rutas sintéticas `/producto/...` en Rech, Click Guatemala, Tera o Guatemala Digital,
-    dominios antiguos `tera.gt`, o URLs vacías/rotas), devuelve la URL oficial de búsqueda
-    de la tienda con el término exacto del producto codificado.
+    Valida que una URL corresponda a una ficha de producto directa real (`https://...`)
+    extraída del HTML/JSON de la tienda y NO a una URL de búsqueda construida por plantilla
+    (`/buscar?q=`, `/busqueda?q=`, `/?s=`, `/Busqueda?Busqueda=`, etc.).
+    """
+    from urllib.parse import urlparse
+
+    u = (url or "").strip()
+    if not u.startswith("https://"):
+        return False
+
+    u_lower = u.lower()
+    if any(patron in u_lower for patron in PATRONES_URL_BUSQUEDA_SINTETICA):
+        return False
+
+    parsed = urlparse(u)
+    if not parsed.netloc or "." not in parsed.netloc:
+        return False
+
+    path = (parsed.path or "").strip("/")
+    if not path and not parsed.query:
+        return False
+
+    # En Pacifiko, una URL de producto real incluye pid= o /compras-en-linea/<slug>&pid=...
+    # mientras que /compras-en-linea/<termino> sin pid y con `+` era una plantilla de búsqueda
+    if "pacifiko.com" in parsed.netloc.lower() and "/compras-en-linea/" in u_lower:
+        if "pid=" not in u_lower and "+" in path:
+            return False
+
+    return True
+
+
+def resolver_url_saliente_segura(url: str, tienda_slug_o_nombre: str = "", titulo: str = "") -> str:
+    """
+    Normaliza a `https://` y preserva únicamente la URL directa real del producto extraída de la tienda.
+    En v5.5 está prohibido reescribir enlaces hacia plantillas de búsqueda adivinadas (`/buscar?q=`, `/busqueda?q=`).
     """
     url_limpia = (url or "").strip()
-    slug = _normalizar_texto(tienda_slug_o_nombre).replace(" ", "-")
-    if slug in {"click-guatemala", "click-gt"}:
-        slug = "click"
-    elif slug in {"rech-guatemala", "rech-gt"}:
-        slug = "rech"
-    elif slug in {"tera-guatemala", "tera-gt"}:
-        slug = "tera"
-    elif slug in {"guatemala-digital", "guatemaladigital.com"}:
-        slug = "guatemaladigital"
-
-    if not url_limpia or not url_limpia.startswith(("http://", "https://")):
-        return construir_url_busqueda_tienda(slug, titulo)
-
-    # En Rech, Click Guatemala, Tera y Guatemala Digital, si la URL es un slug sintético (/producto/...)
-    # o apunta a la raíz sin ruta de producto verificada, redirigir siempre a la búsqueda oficial.
-    if slug in {"rech", "click", "tera", "guatemaladigital"}:
-        if (
-            "/producto/" in url_limpia.lower()
-            or "tera.gt" in url_limpia.lower()
-            or url_limpia.rstrip("/") in {
-                "https://www.rech.com.gt",
-                "https://www.click.gt",
-                "https://www.tera.gt",
-                "https://www.tera.com.gt",
-                "https://guatemaladigital.com",
-                "https://www.guatemaladigital.com",
-            }
-        ):
-            return construir_url_busqueda_tienda(slug, titulo)
-
+    if url_limpia.startswith("//"):
+        url_limpia = f"https:{url_limpia}"
+    elif url_limpia.startswith("http://"):
+        url_limpia = "https://" + url_limpia[len("http://") :]
     return url_limpia
 
 
